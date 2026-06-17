@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "promptcache"
+version = "0.1.0"
+description = "Semantic LLM response caching — stop paying for the same call twice."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["llm", "caching", "semantic", "openai", "anthropic", "embeddings"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+
+# Core dependencies — the bare minimum to run the library.
+# sentence-transformers is in [embed] so it stays optional for users
+# who supply a custom Embedder (e.g. OpenAIEmbedder).
+dependencies = [
+    "qdrant-client>=1.9.0",
+    "duckdb>=0.10.0",
+]
+
+[project.optional-dependencies]
+# Default embedder (sentence-transformers + torch)
+embed = [
+    "sentence-transformers>=3.0.0",
+]
+
+# MCP server for AI coding assistants
+mcp = [
+    "mcp>=1.0.0",
+    "anyio>=4.0.0",
+]
+
+# OpenAI embedder
+openai = [
+    "openai>=1.0.0",
+]
+
+# Everything
+all = [
+    "sentence-transformers>=3.0.0",
+    "mcp>=1.0.0",
+    "anyio>=4.0.0",
+    "openai>=1.0.0",
+    "qdrant-client>=1.9.0",
+    "duckdb>=0.10.0",
+]
+
+# Development tooling
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "sentence-transformers>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/promptcache"
+Repository = "https://github.com/yourusername/promptcache"
+Issues = "https://github.com/yourusername/promptcache/issues"
+
+[project.scripts]
+promptcache = "promptcache.cli:main"
+promptcache-mcp = "promptcache.mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/promptcache"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.mypy]
+mypy_path = "src"
+strict = true
+ignore_missing_imports = true
