@@ -396,6 +396,114 @@ class CacheAnalytics:
             [model],
         )
 
+    def tier_breakdown(
+        self,
+        model: str,
+        window_hours: int = 24,
+    ) -> list[dict[str, Any]]:
+        """
+        Per-tier savings breakdown for the Analytics tab.
+
+        Returns three rows: tier1_semantic, tier2_prefix, tier3_inference.
+
+        Tier 2/3 aggregations filter on tokens_input IS NOT NULL to exclude
+        lookup-miss rows (dashboard double-logging).
+        """
+        now = int(time.time())
+        cutoff = now - window_hours * 3600
+
+        rows = self._q(
+            """
+            SELECT
+                COALESCE(SUM(tier1_cached_input_tokens)
+                    FILTER (WHERE hit_type IN ('exact', 'semantic')), 0)
+                    AS tier1_tokens,
+                COALESCE(SUM(
+                    CASE WHEN hit_type IN ('exact', 'semantic')
+                        THEN COALESCE(tier1_cached_input_tokens, 0)
+                            * model_cost_per_token(model)
+                        ELSE 0.0
+                    END
+                ), 0.0) AS tier1_cost,
+                COUNT(*) FILTER (WHERE hit_type IN ('exact', 'semantic'))
+                    AS tier1_hits,
+                COALESCE(SUM(tier2_cached_input_tokens)
+                    FILTER (WHERE tokens_input IS NOT NULL
+                        AND tier2_cached_input_tokens > 0), 0)
+                    AS tier2_tokens,
+                COALESCE(SUM(tier2_cost_saved)
+                    FILTER (WHERE tokens_input IS NOT NULL), 0.0)
+                    AS tier2_cost,
+                COUNT(*) FILTER (WHERE tokens_input IS NOT NULL
+                    AND tier2_cached_input_tokens > 0)
+                    AS tier2_hits,
+                COALESCE(SUM(tier3_cost_saved)
+                    FILTER (WHERE tokens_input IS NOT NULL), 0.0)
+                    AS tier3_cost,
+                COALESCE(SUM(tier3_hit)
+                    FILTER (WHERE tokens_input IS NOT NULL), 0)
+                    AS tier3_hits
+            FROM cache.calls
+            WHERE timestamp > ?
+              AND model = ?
+            """,
+            [cutoff, model],
+        )
+
+        if not rows:
+            return self._empty_tier_breakdown()
+
+        row = rows[0]
+        return [
+            {
+                "tier": "tier1_semantic",
+                "label": "Tier 1 — Semantic cache",
+                "tokens_saved": int(row.get("tier1_tokens") or 0),
+                "cost_saved": round(float(row.get("tier1_cost") or 0.0), 8),
+                "hit_count": int(row.get("tier1_hits") or 0),
+            },
+            {
+                "tier": "tier2_prefix",
+                "label": "Tier 2 — Prefix cache",
+                "tokens_saved": int(row.get("tier2_tokens") or 0),
+                "cost_saved": round(float(row.get("tier2_cost") or 0.0), 8),
+                "hit_count": int(row.get("tier2_hits") or 0),
+            },
+            {
+                "tier": "tier3_inference",
+                "label": "Tier 3 — Inference cache",
+                "tokens_saved": 0,
+                "cost_saved": round(float(row.get("tier3_cost") or 0.0), 8),
+                "hit_count": int(row.get("tier3_hits") or 0),
+            },
+        ]
+
+    @staticmethod
+    def _empty_tier_breakdown() -> list[dict[str, Any]]:
+        return [
+            {
+                "tier": "tier1_semantic",
+                "label": "Tier 1 — Semantic cache",
+                "tokens_saved": 0,
+                "cost_saved": 0.0,
+                "hit_count": 0,
+            },
+            {
+                "tier": "tier2_prefix",
+                "label": "Tier 2 — Prefix cache",
+                "tokens_saved": 0,
+                "cost_saved": 0.0,
+                "hit_count": 0,
+            },
+            {
+                "tier": "tier3_inference",
+                "label": "Tier 3 — Inference cache",
+                "tokens_saved": 0,
+                "cost_saved": 0.0,
+                "hit_count": 0,
+            },
+        ]
+
     def close(self) -> None:
         """Release the DuckDB in-memory connection."""
         try:

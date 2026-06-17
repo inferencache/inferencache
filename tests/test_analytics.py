@@ -149,3 +149,94 @@ def test_false_positive_queue(analytics):
     assert row["original_prompt"] == "original cached prompt"
     assert row["cached_response"] == '{"answer": "cached"}'
     assert row["similarity"] == pytest.approx(0.87, abs=0.001)
+
+
+def test_tier_breakdown_returns_three_rows(analytics):
+    rows = analytics.tier_breakdown(MODEL, window_hours=24)
+    assert len(rows) == 3
+    tiers = {r["tier"] for r in rows}
+    assert tiers == {"tier1_semantic", "tier2_prefix", "tier3_inference"}
+    for row in rows:
+        assert "tokens_saved" in row
+        assert "cost_saved" in row
+        assert "hit_count" in row
+
+
+def test_tier_breakdown_double_logging_filter(tmp_path):
+    """Tier 2/3 only count store rows (tokens_input IS NOT NULL)."""
+    store = CacheStore(cache_dir=tmp_path / "tier_bd", collection_name="tier-bd")
+    now = time.time()
+
+    # Lookup-miss row — no tokens, should NOT count for tier2/3
+    store.write_call_event(
+        prompt_hash="hash_lookup_miss",
+        model=MODEL,
+        provider=PROVIDER,
+        hit_type="miss",
+        latency_ms=5.0,
+        tier2_cached_input_tokens=999,
+        tier3_hit=1,
+        tier2_cost_saved=0.5,
+        tier3_cost_saved=0.3,
+    )
+    store._conn.execute(
+        "UPDATE calls SET timestamp = ? WHERE id = (SELECT MAX(id) FROM calls)",
+        (now - 60,),
+    )
+
+    # Store-miss row — has tokens, SHOULD count for tier2/3
+    store.write_call_event(
+        prompt_hash="hash_store_miss",
+        model=MODEL,
+        provider=PROVIDER,
+        hit_type="miss",
+        latency_ms=0.0,
+        tokens_input=500,
+        tokens_output=100,
+        tier2_cached_input_tokens=200,
+        tier3_hit=1,
+        tier2_cost_saved=0.01,
+        tier3_cost_saved=0.02,
+    )
+    store._conn.execute(
+        "UPDATE calls SET timestamp = ? WHERE id = (SELECT MAX(id) FROM calls)",
+        (now - 30,),
+    )
+
+    # Tier1 exact hit
+    store.write_call_event(
+        prompt_hash="hash_exact",
+        model=MODEL,
+        provider=PROVIDER,
+        hit_type="exact",
+        latency_ms=2.0,
+        tier1_cached_input_tokens=50,
+    )
+    store._conn.execute(
+        "UPDATE calls SET timestamp = ? WHERE id = (SELECT MAX(id) FROM calls)",
+        (now - 10,),
+    )
+
+    store.close()
+
+    a = CacheAnalytics(tmp_path / "tier_bd")
+    rows = {r["tier"]: r for r in a.tier_breakdown(MODEL, window_hours=1)}
+    a.close()
+
+    assert rows["tier1_semantic"]["hit_count"] == 1
+    assert rows["tier1_semantic"]["tokens_saved"] == 50
+    assert rows["tier2_prefix"]["tokens_saved"] == 200
+    assert rows["tier2_prefix"]["cost_saved"] == pytest.approx(0.01)
+    assert rows["tier2_prefix"]["hit_count"] == 1
+    assert rows["tier3_inference"]["hit_count"] == 1
+    assert rows["tier3_inference"]["cost_saved"] == pytest.approx(0.02)
+
+
+def test_tier_breakdown_empty_window(tmp_path):
+    store = CacheStore(cache_dir=tmp_path / "empty", collection_name="empty")
+    store.close()
+    a = CacheAnalytics(tmp_path / "empty")
+    rows = a.tier_breakdown(MODEL, window_hours=24)
+    a.close()
+    assert len(rows) == 3
+    assert all(r["tokens_saved"] == 0 for r in rows)
