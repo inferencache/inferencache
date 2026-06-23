@@ -119,6 +119,7 @@ async def set_threshold(update: ThresholdUpdate):
 
 
 @router.get("/analytics/hit-rate")
+@router.get("/cache-stats/hit-rate")
 async def analytics_hit_rate(
     model: str = "gpt-4o-mini",
     window_hours: int = 24,
@@ -132,6 +133,7 @@ async def analytics_hit_rate(
 
 
 @router.get("/analytics/cost-saved")
+@router.get("/cache-stats/cost-saved")
 async def analytics_cost_saved(model: str = "gpt-4o-mini", window_hours: int = 24):
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(
@@ -141,6 +143,7 @@ async def analytics_cost_saved(model: str = "gpt-4o-mini", window_hours: int = 2
 
 
 @router.get("/analytics/endpoints")
+@router.get("/cache-stats/endpoints")
 async def analytics_endpoints(
     model: str = "gpt-4o-mini",
     window_hours: int = 24,
@@ -154,6 +157,7 @@ async def analytics_endpoints(
 
 
 @router.get("/analytics/similarity-dist")
+@router.get("/cache-stats/similarity-dist")
 async def analytics_similarity_dist(
     model: str = "gpt-4o-mini",
     window_hours: int = 24,
@@ -167,6 +171,7 @@ async def analytics_similarity_dist(
 
 
 @router.get("/analytics/tier-breakdown")
+@router.get("/cache-stats/tier-breakdown")
 async def analytics_tier_breakdown(model: str = "gpt-4o-mini", window_hours: int = 24):
     loop = asyncio.get_event_loop()
     rows = await loop.run_in_executor(

@@ -21,11 +21,12 @@ SEMANTIC/
 ./inferencache/scripts/build-dashboard.sh
 ```
 
-Copies the Next static export to `src/inferencache/proxy/site/`.
+Copies the Next static export to `src/inferencache/proxy/site/` (gitignored). Release builds run this before packaging; local dev can skip it — the proxy serves a JSON hint until the site is built.
 
 ## CLI
 
 ```bash
-pip install -e ".[embed,serve]"
+./inferencache/scripts/ensure-site-dir.sh   # empty dir required for pip editable install
+pip install -e ".[embed,serve,dev]"
 inferencache serve
 ```

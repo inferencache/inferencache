@@ -32,7 +32,9 @@ jobs:
         env:
           DASHBOARD_REPO: ${{ github.workspace }}/inferencache-dashboard
           INFERENCACHE_REPO: ${{ github.workspace }}
-        run: ./scripts/build-dashboard.sh
+        run: |
+          ./scripts/ensure-site-dir.sh
+          ./scripts/build-dashboard.sh
 
       - name: Set up Python
         uses: actions/setup-python@v5
