@@ -5,20 +5,20 @@
 | Repo | Purpose |
 |------|---------|
 | [lavondev/inferencache](https://github.com/lavondev/inferencache) | Python library, proxy server, embedded site assets |
-| [lavondev/inferencache-ui](https://github.com/lavondev/inferencache) | Next.js dashboard + landing (dev clone: `promptcache-dashboard`) |
+| [lavondev/inferencache-ui](https://github.com/lavondev/inferencache) | Next.js dashboard + landing (dev clone: `inferencache-dashboard`) |
 
 ## Local layout
 
 ```
 SEMANTIC/
-  promptcache/           ← Python package (inferencache on PyPI)
-  promptcache-dashboard/ ← Next.js frontend
+  inferencache/           ← Python package
+  inferencache-dashboard/ ← Next.js frontend
 ```
 
 ## Build embedded site
 
 ```bash
-./promptcache/scripts/build-dashboard.sh
+./inferencache/scripts/build-dashboard.sh
 ```
 
 Copies the Next static export to `src/inferencache/proxy/site/`.

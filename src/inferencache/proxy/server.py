@@ -156,7 +156,7 @@ def create_app(
                 {
                     "error": (
                         "Site not built. Run: ./scripts/build-dashboard.sh "
-                        "or npm run build in promptcache-dashboard/frontend-next"
+                        "or npm run build in inferencache-dashboard/frontend-next"
                     )
                 },
                 status_code=503,

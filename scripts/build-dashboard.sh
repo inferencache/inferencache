@@ -4,13 +4,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INFERENCACHE_REPO="${INFERENCACHE_REPO:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DASHBOARD_REPO="${DASHBOARD_REPO:-$(cd "$INFERENCACHE_REPO/../promptcache-dashboard" && pwd)}"
+DASHBOARD_REPO="${DASHBOARD_REPO:-$(cd "$INFERENCACHE_REPO/../inferencache-dashboard" && pwd)}"
 FRONTEND_DIR="$DASHBOARD_REPO/frontend-next"
 OUT_DIR="$INFERENCACHE_REPO/src/inferencache/proxy/site"
 
 if [ ! -d "$FRONTEND_DIR" ]; then
   echo "ERROR: frontend not found at $FRONTEND_DIR"
-  echo "Set DASHBOARD_REPO to your inferencache-ui / promptcache-dashboard clone."
+  echo "Set DASHBOARD_REPO to your inferencache-dashboard clone."
   exit 1
 fi
 
