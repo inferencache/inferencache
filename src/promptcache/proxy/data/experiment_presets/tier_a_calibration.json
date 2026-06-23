@@ -1,0 +1,15 @@
+{
+  "batch_id": "tier-a-calibration",
+  "description": "Baseline calibration — one cold run per suite at threshold 0.85",
+  "base": {
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "repeat_factor": 2,
+    "delay_between_ms": 200,
+    "cache_mode": "cold",
+    "threshold": 0.85
+  },
+  "matrix": {
+    "suite_name": ["general_qa", "coding", "summarization"]
+  }
+}

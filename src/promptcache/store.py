@@ -110,6 +110,14 @@ def _hash_key(prompt: str, model: str) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _metadata_session_hash(metadata: dict[str, Any] | None) -> str | None:
+    """Extract session_hash from entry metadata, if present."""
+    if not metadata:
+        return None
+    value = metadata.get("session_hash")
+    return str(value) if value is not None else None
+
+
 def _qdrant_point_id(prompt_hash: str) -> int:
     """Derive a stable int64 Qdrant point ID from a SHA-256 hex digest."""
     return int(prompt_hash[:16], 16) % (2**63)
@@ -203,6 +211,12 @@ class CacheStore:
         tokens_input: int | None = None,
         tokens_output: int | None = None,
         cost_usd: float | None = None,
+        session_hash: str | None = None,
+        tier1_cached_input_tokens: int | None = None,
+        tier2_cached_input_tokens: int | None = None,
+        tier3_hit: int | None = None,
+        tier2_cost_saved: float | None = None,
+        tier3_cost_saved: float | None = None,
     ) -> int:
         """
         Insert one row into the calls event log.
@@ -215,14 +229,24 @@ class CacheStore:
                 """
                 INSERT INTO calls (
                     prompt_hash, model, provider, endpoint, session_id,
+                    session_hash,
                     hit_type, similarity, latency_ms,
-                    tokens_input, tokens_output, cost_usd, timestamp
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    tokens_input, tokens_output, cost_usd,
+                    tier1_cached_input_tokens, tier2_cached_input_tokens,
+                    tier3_hit, tier2_cost_saved, tier3_cost_saved,
+                    timestamp
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     prompt_hash, model, provider, endpoint, session_id,
+                    session_hash,
                     hit_type, similarity, latency_ms,
                     tokens_input, tokens_output, cost_usd,
+                    tier1_cached_input_tokens or 0,
+                    tier2_cached_input_tokens or 0,
+                    tier3_hit or 0,
+                    tier2_cost_saved or 0.0,
+                    tier3_cost_saved or 0.0,
                     time.time(),
                 ),
             )
@@ -245,9 +269,17 @@ class CacheStore:
     # Public read API
     # ------------------------------------------------------------------
 
-    def get_exact(self, prompt: str, model: str) -> CacheEntry | None:
+    def get_exact(
+        self,
+        prompt: str,
+        model: str,
+        session_hash: str | None = None,
+    ) -> CacheEntry | None:
         """
         Look up an entry by exact (prompt, model) match.
+
+        When session_hash is provided, only returns the entry if its
+        metadata.session_hash matches (session-scoped exact match).
 
         Returns None if no match exists.
         """
@@ -257,7 +289,18 @@ class CacheStore:
         ).fetchone()
         if row is None:
             return None
-        return self._row_to_entry(row)
+        entry = self._row_to_entry(row)
+        if session_hash is not None:
+            stored = _metadata_session_hash(entry.metadata)
+            if stored != session_hash:
+                return None
+        return entry
+
+    @staticmethod
+    def _matches_session_hash(entry: CacheEntry, session_hash: str | None) -> bool:
+        if session_hash is None:
+            return True
+        return _metadata_session_hash(entry.metadata) == session_hash
 
     def query_semantic(
         self,
@@ -265,6 +308,7 @@ class CacheStore:
         model: str,
         threshold: float,
         top_k: int = 5,
+        session_hash: str | None = None,
     ) -> list[tuple[CacheEntry, float]]:
         """
         Query Qdrant for semantically similar entries.
@@ -310,7 +354,7 @@ class CacheStore:
         hits: list[tuple[CacheEntry, float]] = []
         for r in results:
             entry = self.get_exact_by_hash(r.payload["prompt_hash"])
-            if entry:
+            if entry and self._matches_session_hash(entry, session_hash):
                 hits.append((entry, round(r.score, 4)))
 
         hits.sort(key=lambda x: x[1], reverse=True)
@@ -489,20 +533,26 @@ class CacheStore:
             INSERT OR IGNORE INTO stats (id, miss_count) VALUES (1, 0);
 
             CREATE TABLE IF NOT EXISTS calls (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                prompt_hash     TEXT NOT NULL,
-                model           TEXT NOT NULL,
-                provider        TEXT NOT NULL,
-                endpoint        TEXT,
-                session_id      TEXT,
-                hit_type        TEXT NOT NULL,
-                similarity      REAL,
-                latency_ms      REAL NOT NULL,
-                tokens_input    INTEGER,
-                tokens_output   INTEGER,
-                cost_usd        REAL,
-                false_positive  INTEGER NOT NULL DEFAULT 0,
-                timestamp       REAL NOT NULL
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                prompt_hash                 TEXT NOT NULL,
+                model                       TEXT NOT NULL,
+                provider                    TEXT NOT NULL,
+                endpoint                    TEXT,
+                session_id                  TEXT,
+                session_hash                TEXT,
+                hit_type                    TEXT NOT NULL,
+                similarity                  REAL,
+                latency_ms                  REAL NOT NULL,
+                tokens_input                INTEGER,
+                tokens_output               INTEGER,
+                cost_usd                    REAL,
+                tier1_cached_input_tokens   INTEGER DEFAULT 0,
+                tier2_cached_input_tokens   INTEGER DEFAULT 0,
+                tier3_hit                   INTEGER NOT NULL DEFAULT 0,
+                tier2_cost_saved            REAL DEFAULT 0,
+                tier3_cost_saved            REAL DEFAULT 0,
+                false_positive              INTEGER NOT NULL DEFAULT 0,
+                timestamp                   REAL NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_calls_timestamp
@@ -522,6 +572,21 @@ class CacheStore:
         conn.commit()
         return conn
 
+    _SCHEMA_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+        "entries": [
+            ("endpoint", "TEXT"),
+            ("session_id", "TEXT"),
+        ],
+        "calls": [
+            ("session_hash", "TEXT"),
+            ("tier1_cached_input_tokens", "INTEGER DEFAULT 0"),
+            ("tier2_cached_input_tokens", "INTEGER DEFAULT 0"),
+            ("tier3_hit", "INTEGER NOT NULL DEFAULT 0"),
+            ("tier2_cost_saved", "REAL DEFAULT 0"),
+            ("tier3_cost_saved", "REAL DEFAULT 0"),
+        ],
+    }
+
     @staticmethod
     def _migrate_sqlite_schema(conn: sqlite3.Connection) -> None:
         """
@@ -531,15 +596,16 @@ class CacheStore:
         guard each ALTER with a PRAGMA table_info check and catch the
         OperationalError that fires if the column already exists.
         """
-        existing_cols = {
-            row[1] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
-        }
-        for col, typedef in (("endpoint", "TEXT"), ("session_id", "TEXT")):
-            if col not in existing_cols:
-                try:
-                    conn.execute(f"ALTER TABLE entries ADD COLUMN {col} {typedef}")
-                except sqlite3.OperationalError:
-                    pass
+        for table, columns in CacheStore._SCHEMA_MIGRATIONS.items():
+            existing_cols = {
+                row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            for col, typedef in columns:
+                if col not in existing_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typedef}")
+                    except sqlite3.OperationalError:
+                        pass
 
     def _sqlite_write(self, entry: CacheEntry) -> None:
         metadata_json = json.dumps(entry.metadata) if entry.metadata else None

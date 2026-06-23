@@ -295,3 +295,94 @@ def test_hit_result_has_latency(engine):
     result = engine.lookup("prompt")
     assert result.hit is True
     assert result.latency_ms >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Multi-tier (opt-in)
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_path_uses_lookup_legacy_directly(engine):
+    """Default config delegates to _lookup_legacy unchanged."""
+    engine.store("legacy prompt", "legacy response")
+    result = engine._lookup_legacy("legacy prompt")
+    assert result.hit is True
+    assert result.hit_type == "exact"
+    assert result.tier1_hit is True
+    assert result.tier1_tokens_saved > 0
+
+
+def test_tier_auto_routes_code_threshold(tmp_cache_dir):
+    """tier='auto' uses CODE threshold 0.92 for code prompts."""
+    similar_vec = [0.1] * 384
+
+    class SimilarEmbedder:
+        def embed(self, text: str) -> list[float]:
+            return similar_vec[:]
+
+        def model_id(self) -> str:
+            return "similar-embedder"
+
+    config = CacheConfig(
+        cache_dir=tmp_cache_dir,
+        model="test-model",
+        threshold=0.99,  # global would block; router should use 0.92
+        embedder=SimilarEmbedder(),
+        tier="auto",
+        provider="openai",
+    )
+    engine = CacheEngine(config)
+    try:
+        engine.store("def foo(): pass", "code response")
+        result = engine.lookup("def bar(): pass")
+        assert result.hit is True
+        assert result.tier1_hit is True
+    finally:
+        engine.close()
+
+
+def test_session_aware_prevents_cross_session_hit(tmp_cache_dir):
+    config = CacheConfig(
+        cache_dir=tmp_cache_dir,
+        model="test-model",
+        threshold=0.85,
+        embedder=FakeEmbedder(),
+        session_aware=True,
+    )
+    engine = CacheEngine(config)
+    try:
+        history_a = ["context A"]
+        session_hash = engine._session_lookup._session_hash(history_a)
+        engine.store(
+            "fix the bug",
+            "fixed",
+            session_hash=session_hash,
+        )
+        result = engine.lookup(
+            "fix the bug",
+            session_history=["different context"],
+        )
+        assert result.hit is False
+    finally:
+        engine.close()
+
+
+def test_prefix_warnings_on_miss_with_tier_auto(tmp_cache_dir):
+    config = CacheConfig(
+        cache_dir=tmp_cache_dir,
+        model="test-model",
+        threshold=0.85,
+        embedder=FakeEmbedder(),
+        tier="auto",
+        provider="openai",
+    )
+    engine = CacheEngine(config)
+    try:
+        result = engine.lookup(
+            "unknown",
+            system_prompt="Help {user} today",
+        )
+        assert result.hit is False
+        assert len(result.prefix_warnings) >= 1
+    finally:
+        engine.close()

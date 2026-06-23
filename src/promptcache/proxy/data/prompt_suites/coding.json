@@ -1,0 +1,40 @@
+{
+  "name": "coding",
+  "description": "Coding questions — semantic cache test for paraphrased dev questions",
+  "prompts": [
+    "Write a Python function to reverse a string.",
+    "How do I reverse a string in Python?",
+    "Python: reverse a string",
+    "Write a binary search algorithm in Python.",
+    "Implement binary search in Python.",
+    "How does binary search work? Show me Python code.",
+    "What is a decorator in Python?",
+    "Explain Python decorators with an example.",
+    "How do Python decorators work?",
+    "How do I handle exceptions in Python?",
+    "Show me try/except in Python.",
+    "What is the correct way to catch errors in Python?",
+    "What is the difference between a list and a tuple in Python?",
+    "When should I use a tuple instead of a list in Python?",
+    "Python list vs tuple — what's the difference?",
+    "How do I read a file in Python?",
+    "Write Python code to open and read a file.",
+    "What is the best way to read a text file in Python?",
+    "Explain async/await in Python.",
+    "How does asyncio work in Python?",
+    "What is the difference between async def and regular def in Python?",
+    "How do I connect to a SQLite database in Python?",
+    "Show me how to use sqlite3 in Python.",
+    "Write Python code to query a SQLite database."
+  ],
+  "groups": [
+    { "id": "reverse_string", "prompts": ["Write a Python function to reverse a string.", "How do I reverse a string in Python?", "Python: reverse a string"] },
+    { "id": "binary_search", "prompts": ["Write a binary search algorithm in Python.", "Implement binary search in Python.", "How does binary search work? Show me Python code."] },
+    { "id": "decorators", "prompts": ["What is a decorator in Python?", "Explain Python decorators with an example.", "How do Python decorators work?"] },
+    { "id": "exceptions", "prompts": ["How do I handle exceptions in Python?", "Show me try/except in Python.", "What is the correct way to catch errors in Python?"] },
+    { "id": "list_vs_tuple", "prompts": ["What is the difference between a list and a tuple in Python?", "When should I use a tuple instead of a list in Python?", "Python list vs tuple — what's the difference?"] },
+    { "id": "read_file", "prompts": ["How do I read a file in Python?", "Write Python code to open and read a file.", "What is the best way to read a text file in Python?"] },
+    { "id": "async_await", "prompts": ["Explain async/await in Python.", "How does asyncio work in Python?", "What is the difference between async def and regular def in Python?"] },
+    { "id": "sqlite", "prompts": ["How do I connect to a SQLite database in Python?", "Show me how to use sqlite3 in Python.", "Write Python code to query a SQLite database."] }
+  ]
+}

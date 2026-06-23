@@ -2,13 +2,10 @@
 cli.py — Command-line interface for promptcache.
 
 Commands:
+    promptcache serve   — Start proxy server + embedded dashboard
     promptcache stats   — Print hit rate, cost saved, top cached queries
     promptcache clear   — Flush the cache (optionally by model)
     promptcache config  — Show active configuration
-
-Entry point registered in pyproject.toml as:
-    [project.scripts]
-    promptcache = "promptcache.cli:main"
 """
 
 from __future__ import annotations
@@ -217,6 +214,52 @@ def cmd_config(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# serve command
+# ---------------------------------------------------------------------------
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    """Start proxy + dashboard."""
+    import threading
+    import webbrowser
+
+    try:
+        import uvicorn
+    except ImportError as exc:
+        print(
+            "promptcache serve requires the [serve] extra:\n"
+            '  pip install "promptcache[serve]"',
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    from .proxy.server import create_app
+
+    app = create_app(
+        cache_dir=Path(args.cache_dir),
+        serve_dashboard=not args.no_dashboard,
+    )
+
+    dashboard_url = f"http://{args.host}:{args.port}/dashboard"
+    proxy_url = f"http://{args.host}:{args.port}"
+
+    print(f"\n  promptcache proxy  →  {proxy_url}")
+    if not args.no_dashboard:
+        print(f"  dashboard          →  {dashboard_url}\n")
+
+    if not args.no_browser and not args.no_dashboard:
+
+        def _open() -> None:
+            time.sleep(1.2)
+            webbrowser.open(dashboard_url)
+
+        threading.Thread(target=_open, daemon=True).start()
+
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -235,7 +278,6 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     sub.required = True
 
-    # ── stats ──
     stats_p = sub.add_parser("stats", help="Show cache statistics")
     stats_p.add_argument(
         "--model",
@@ -270,7 +312,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stats_p.set_defaults(func=cmd_stats)
 
-    # ── clear ──
     clear_p = sub.add_parser("clear", help="Delete cached entries")
     clear_p.add_argument(
         "--model",
@@ -284,9 +325,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     clear_p.set_defaults(func=cmd_clear)
 
-    # ── config ──
     config_p = sub.add_parser("config", help="Show active configuration")
     config_p.set_defaults(func=cmd_config)
+
+    serve_p = sub.add_parser("serve", help="Start the proxy server + dashboard")
+    serve_p.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to bind (default: 8080)",
+    )
+    serve_p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind (default: 127.0.0.1)",
+    )
+    serve_p.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Don't auto-open the dashboard in a browser",
+    )
+    serve_p.add_argument(
+        "--no-dashboard",
+        action="store_true",
+        help="Start proxy only, no dashboard",
+    )
+    serve_p.set_defaults(func=cmd_serve)
 
     return parser
 

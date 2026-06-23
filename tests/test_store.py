@@ -248,10 +248,105 @@ def test_sqlite_migration_creates_calls_table(store):
     }
     required = {
         "id", "prompt_hash", "model", "provider", "endpoint", "session_id",
+        "session_hash",
         "hit_type", "similarity", "latency_ms", "tokens_input", "tokens_output",
-        "cost_usd", "false_positive", "timestamp",
+        "cost_usd",
+        "tier1_cached_input_tokens", "tier2_cached_input_tokens",
+        "tier3_hit", "tier2_cost_saved", "tier3_cost_saved",
+        "false_positive", "timestamp",
     }
     assert required.issubset(cols)
+
+
+def test_calls_migration_adds_tier_columns(tmp_path):
+    """Pre-migration calls table gains tier columns via ALTER."""
+    import sqlite3
+
+    cache_dir = tmp_path / "legacy_calls"
+    cache_dir.mkdir()
+    db_path = cache_dir / "index.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TABLE calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prompt_hash TEXT NOT NULL,
+            model TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            endpoint TEXT,
+            session_id TEXT,
+            hit_type TEXT NOT NULL,
+            similarity REAL,
+            latency_ms REAL NOT NULL,
+            tokens_input INTEGER,
+            tokens_output INTEGER,
+            cost_usd REAL,
+            false_positive INTEGER NOT NULL DEFAULT 0,
+            timestamp REAL NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    store = CacheStore(cache_dir=cache_dir, collection_name="legacy_col")
+    cols = {
+        row[1] for row in store._conn.execute("PRAGMA table_info(calls)").fetchall()
+    }
+    store.close()
+
+    assert "session_hash" in cols
+    assert "tier1_cached_input_tokens" in cols
+    assert "tier2_cached_input_tokens" in cols
+    assert "tier3_hit" in cols
+    assert "tier2_cost_saved" in cols
+    assert "tier3_cost_saved" in cols
+
+
+def test_get_exact_filters_by_session_hash(store):
+    """get_exact with session_hash only returns session-scoped entries."""
+    import time as _time
+
+    entry_a = CacheEntry(
+        prompt="scoped prompt",
+        model="test-model",
+        response="response A",
+        created_at=_time.time(),
+        metadata={"session_hash": "session_a"},
+    )
+    store.write(entry_a)
+
+    assert store.get_exact("scoped prompt", "test-model", session_hash="session_a") is not None
+    assert store.get_exact("scoped prompt", "test-model", session_hash="session_b") is None
+    assert store.get_exact("scoped prompt", "test-model") is not None
+
+
+def test_write_call_event_persists_tier_fields(store):
+    """Per-tier savings columns are persisted correctly."""
+    row_id = store.write_call_event(
+        prompt_hash="tier_test",
+        model="gpt-4o",
+        provider="openai",
+        hit_type="miss",
+        latency_ms=50.0,
+        session_hash="abc123def456",
+        tier1_cached_input_tokens=0,
+        tier2_cached_input_tokens=512,
+        tier3_hit=1,
+        tier2_cost_saved=0.001,
+        tier3_cost_saved=0.002,
+        tokens_input=1000,
+        tokens_output=200,
+    )
+    row = store._conn.execute(
+        "SELECT * FROM calls WHERE id = ?", (row_id,)
+    ).fetchone()
+    assert row["session_hash"] == "abc123def456"
+    assert row["tier1_cached_input_tokens"] == 0
+    assert row["tier2_cached_input_tokens"] == 512
+    assert row["tier3_hit"] == 1
+    assert row["tier2_cost_saved"] == pytest.approx(0.001)
+    assert row["tier3_cost_saved"] == pytest.approx(0.002)
 
 
 def test_sqlite_migration_creates_calls_indexes(store):
