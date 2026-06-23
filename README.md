@@ -21,6 +21,35 @@ Three lines of code. Every LLM call now checks the cache before it leaves your m
 
 ---
 
+## Quick start (proxy + dashboard)
+
+One command starts a local proxy and web dashboard. Point your AI coding assistant at it — no code changes required.
+
+```bash
+pip install "promptcache[embed,serve]"
+export ANTHROPIC_API_KEY=sk-ant-...
+promptcache serve
+# proxy:     http://localhost:8080
+# dashboard: http://localhost:8080/dashboard
+```
+
+**Agent configuration:**
+
+| Tool | Setting |
+|------|---------|
+| Cursor | Settings → Claude API → Base URL → `http://localhost:8080` |
+| Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8080` |
+| OpenAI SDK | `export OPENAI_BASE_URL=http://localhost:8080` |
+
+```python
+import anthropic
+client = anthropic.Anthropic(base_url="http://localhost:8080")
+```
+
+Repeat calls hit the cache automatically. Open the dashboard to watch live stats, run test suites, and tune your similarity threshold.
+
+---
+
 ## How it works
 
 promptcache runs three checks on every call, in order:
@@ -47,16 +76,17 @@ All three tiers log to a local SQLite event store. The dashboard reads it.
 ## Install
 
 ```bash
-# Core library + default embedder (bge-small-en-v1.5)
-pip install promptcache[embed]
+# Proxy + dashboard (recommended for Cursor / Claude Code users)
+pip install "promptcache[embed,serve]"
+
+# Library only + default embedder (bge-small-en-v1.5)
+pip install "promptcache[embed]"
 
 # With MCP server for Cursor / Windsurf / Claude Code
-pip install promptcache[embed,mcp]
+pip install "promptcache[embed,mcp]"
 ```
 
-Python 3.10+. No gateway, no Docker, no external services.
-
----
+Python 3.10+. No Docker, no external services. Cache data lives in `~/.cache/promptcache`.
 
 ## Usage
 
@@ -136,7 +166,13 @@ CacheConfig(model="llama3.2", provider="ollama")  # local
 ## CLI
 
 ```bash
+promptcache serve                    # start proxy + dashboard
+promptcache serve --no-browser       # don't auto-open browser
+promptcache serve --no-dashboard     # proxy only
 promptcache stats --model gpt-4o
+promptcache stats --json | jq .hit_rate
+promptcache clear --model gpt-4o -y
+promptcache config
 ```
 
 ```
@@ -158,12 +194,6 @@ promptcache stats --model gpt-4o
   Top cached prompts:
    1. [ 234×]  'Summarize this document in three sentences...'
    2. [  89×]  'What is the sentiment of the following text...'
-```
-
-```bash
-promptcache stats --json | jq .hit_rate
-promptcache clear --model gpt-4o -y
-promptcache config
 ```
 
 ---
@@ -205,21 +235,39 @@ Ask your assistant: *"How much have I saved with promptcache this week?"*
 
 ## Testing dashboard
 
-A Next.js dashboard for pressure-testing your cache with real API calls. Fires prompt suites, streams results live, shows latency and cost per call, breaks down savings by tier.
+The dashboard is embedded in `promptcache serve` at `http://localhost:8080/dashboard`. It pressure-tests your cache with real API calls, streams results live, and breaks down savings by tier.
+
+**End users:** use `promptcache serve` — no separate setup needed.
+
+**UI contributors:** clone [promptcache-ui](https://github.com/lavondev/promptcache-ui) alongside this repo and run the frontend in dev mode:
 
 ```bash
-cd promptcache-dashboard
+# From a parent directory:
+git clone https://github.com/lavondev/promptcache.git
+git clone https://github.com/lavondev/promptcache-ui.git promptcache-dashboard
 
-# Terminal 1 — backend
-pip install -r backend/requirements.txt
-uvicorn backend.main:app --reload --port 8000
+# Terminal 1 — dev backend (shared control API from this package)
+cd promptcache-dashboard/backend
+pip install -e ../../promptcache[embed,serve]
+./run.sh
+# → http://localhost:8000/api
 
-# Terminal 2 — frontend
-cd frontend-next && npm install && npm run dev
+# Terminal 2 — frontend hot reload
+cd promptcache-dashboard/frontend-next
+cp .env.example .env.local
+# Set NEXT_PUBLIC_API_URL=http://localhost:8000/api in .env.local
+npm install && npm run dev
 # → http://localhost:3000
 ```
 
-Built-in prompt suites: `general_qa`, `coding`, `summarization` — each with paraphrase clusters designed to demonstrate semantic hits, not just exact matches.
+To embed a production build into the wheel:
+
+```bash
+cd promptcache
+./scripts/build-dashboard.sh
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full two-repo layout.
 
 ---
 
@@ -254,7 +302,7 @@ CacheConfig(
 
 ## What stays out of scope
 
-No gateway process. No sidecar. No config files beyond what you pass to `CacheConfig`. No framework lock-in — works with any function that calls an LLM. The only things that run are SQLite (already on your system) and Qdrant (embedded, file-based).
+No mandatory gateway — use the library decorator directly, or `promptcache serve` if you want a drop-in proxy. No sidecar. No config files beyond what you pass to `CacheConfig`. No framework lock-in. The only things that run are SQLite (already on your system) and Qdrant (embedded, file-based).
 
 ---
 

@@ -1,0 +1,15 @@
+{
+  "batch_id": "tier-b-threshold-sweep",
+  "description": "Cold-cache threshold sweep across all suites (3 suites x 5 thresholds = 15 runs)",
+  "base": {
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "repeat_factor": 2,
+    "delay_between_ms": 200,
+    "cache_mode": "cold"
+  },
+  "matrix": {
+    "suite_name": ["general_qa", "coding", "summarization"],
+    "threshold": [0.75, 0.80, 0.85, 0.90, 0.95]
+  }
+}

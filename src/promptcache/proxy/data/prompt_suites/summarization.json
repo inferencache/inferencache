@@ -1,0 +1,40 @@
+{
+  "name": "summarization",
+  "description": "Summarization tasks — tests semantic matching on paraphrased task descriptions",
+  "prompts": [
+    "Summarize the water cycle in 2-3 sentences.",
+    "Briefly explain the water cycle.",
+    "Describe the water cycle concisely.",
+    "What are the main steps of photosynthesis?",
+    "Explain photosynthesis briefly.",
+    "Summarize photosynthesis in simple terms.",
+    "What is the Turing test and why does it matter?",
+    "Briefly describe the Turing test.",
+    "Summarize what the Turing test is.",
+    "Explain blockchain technology in simple terms.",
+    "What is blockchain? Keep it brief.",
+    "Give me a short summary of how blockchain works.",
+    "What is the greenhouse effect?",
+    "Briefly explain the greenhouse effect.",
+    "Summarize the greenhouse effect in 2 sentences.",
+    "What is the difference between RAM and storage?",
+    "Briefly explain RAM vs storage.",
+    "Summarize the difference between RAM and hard drive storage.",
+    "What is DNS and how does it work?",
+    "Explain DNS briefly.",
+    "What does DNS do? Keep the answer short.",
+    "What is an API and why is it useful?",
+    "Briefly explain what an API is.",
+    "Summarize what APIs do in software development."
+  ],
+  "groups": [
+    { "id": "water_cycle", "prompts": ["Summarize the water cycle in 2-3 sentences.", "Briefly explain the water cycle.", "Describe the water cycle concisely."] },
+    { "id": "photosynthesis", "prompts": ["What are the main steps of photosynthesis?", "Explain photosynthesis briefly.", "Summarize photosynthesis in simple terms."] },
+    { "id": "turing_test", "prompts": ["What is the Turing test and why does it matter?", "Briefly describe the Turing test.", "Summarize what the Turing test is."] },
+    { "id": "blockchain", "prompts": ["Explain blockchain technology in simple terms.", "What is blockchain? Keep it brief.", "Give me a short summary of how blockchain works."] },
+    { "id": "greenhouse_effect", "prompts": ["What is the greenhouse effect?", "Briefly explain the greenhouse effect.", "Summarize the greenhouse effect in 2 sentences."] },
+    { "id": "ram_vs_storage", "prompts": ["What is the difference between RAM and storage?", "Briefly explain RAM vs storage.", "Summarize the difference between RAM and hard drive storage."] },
+    { "id": "dns", "prompts": ["What is DNS and how does it work?", "Explain DNS briefly.", "What does DNS do? Keep the answer short."] },
+    { "id": "api", "prompts": ["What is an API and why is it useful?", "Briefly explain what an API is.", "Summarize what APIs do in software development."] }
+  ]
+}

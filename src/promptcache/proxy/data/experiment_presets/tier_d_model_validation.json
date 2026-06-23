@@ -1,0 +1,15 @@
+{
+  "batch_id": "tier-d-model-validation",
+  "description": "Model validation — gpt-4o threshold sweep on general_qa and coding (6 runs)",
+  "base": {
+    "model": "gpt-4o",
+    "provider": "openai",
+    "repeat_factor": 2,
+    "delay_between_ms": 200,
+    "cache_mode": "cold"
+  },
+  "matrix": {
+    "suite_name": ["general_qa", "coding"],
+    "threshold": [0.80, 0.85, 0.90]
+  }
+}

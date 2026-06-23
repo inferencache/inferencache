@@ -1,0 +1,42 @@
+{
+  "name": "general_qa",
+  "description": "General knowledge Q&A — good mix of exact and semantic cache opportunities",
+  "prompts": [
+    "What is the capital of France?",
+    "What is the capital city of France?",
+    "Where is Paris located?",
+    "What is machine learning?",
+    "Can you explain machine learning to me?",
+    "How does machine learning work?",
+    "What is the difference between Python 2 and Python 3?",
+    "How do Python 2 and Python 3 differ?",
+    "What changed between Python 2 and Python 3?",
+    "What is a REST API?",
+    "Explain what a RESTful API is.",
+    "What does REST stand for in REST API?",
+    "What is the speed of light?",
+    "How fast does light travel?",
+    "What is the speed of light in meters per second?",
+    "What is quantum computing?",
+    "Explain quantum computing briefly.",
+    "How is quantum computing different from classical computing?",
+    "What is Docker?",
+    "What does Docker do?",
+    "Why would you use Docker instead of a virtual machine?",
+    "What is a neural network?",
+    "How do neural networks work?",
+    "What is deep learning?",
+    "How is deep learning related to neural networks?"
+  ],
+  "groups": [
+    { "id": "france_capital", "prompts": ["What is the capital of France?", "What is the capital city of France?", "Where is Paris located?"] },
+    { "id": "machine_learning", "prompts": ["What is machine learning?", "Can you explain machine learning to me?", "How does machine learning work?"] },
+    { "id": "python2_vs_3", "prompts": ["What is the difference between Python 2 and Python 3?", "How do Python 2 and Python 3 differ?", "What changed between Python 2 and Python 3?"] },
+    { "id": "rest_api", "prompts": ["What is a REST API?", "Explain what a RESTful API is.", "What does REST stand for in REST API?"] },
+    { "id": "speed_of_light", "prompts": ["What is the speed of light?", "How fast does light travel?", "What is the speed of light in meters per second?"] },
+    { "id": "quantum_computing", "prompts": ["What is quantum computing?", "Explain quantum computing briefly.", "How is quantum computing different from classical computing?"] },
+    { "id": "docker", "prompts": ["What is Docker?", "What does Docker do?", "Why would you use Docker instead of a virtual machine?"] },
+    { "id": "neural_networks", "prompts": ["What is a neural network?", "How do neural networks work?", "What is deep learning?"] },
+    { "id": "deep_learning", "prompts": ["What is deep learning?", "How is deep learning related to neural networks?"] }
+  ]
+}
