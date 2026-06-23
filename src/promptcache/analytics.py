@@ -382,7 +382,7 @@ class CacheAnalytics:
             SELECT
                 c.id,
                 c.prompt_hash,
-                c.similarity,
+                COALESCE(c.similarity, 0) AS similarity,
                 c.timestamp,
                 e.prompt    AS original_prompt,
                 e.response  AS cached_response
