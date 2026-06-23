@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "promptcache"
+name = "inferencache"
 version = "0.1.0"
 description = "Semantic LLM response caching — stop paying for the same call twice."
 readme = "README.md"
@@ -30,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lavondev/promptcache"
-Repository = "https://github.com/lavondev/promptcache"
-Issues = "https://github.com/lavondev/promptcache/issues"
+Homepage = "https://github.com/lavondev/inferencache"
+Repository = "https://github.com/lavondev/inferencache"
+Issues = "https://github.com/lavondev/inferencache/issues"
 
 [project.optional-dependencies]
 # Default embedder (sentence-transformers + torch)
@@ -83,16 +83,16 @@ dev = [
 ]
 
 [project.scripts]
-promptcache = "promptcache.cli:main"
-promptcache-mcp = "promptcache.mcp.server:main"
-promptcache-serve = "promptcache.proxy.server:main"
+inferencache = "inferencache.cli:main"
+inferencache-mcp = "inferencache.mcp.server:main"
+inferencache-serve = "inferencache.proxy.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/promptcache"]
+packages = ["src/inferencache"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/promptcache/proxy/data" = "promptcache/proxy/data"
-"src/promptcache/proxy/dashboard" = "promptcache/proxy/dashboard"
+"src/inferencache/proxy/data" = "inferencache/proxy/data"
+"src/inferencache/proxy/site" = "inferencache/proxy/site"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

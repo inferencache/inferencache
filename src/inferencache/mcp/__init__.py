@@ -1,4 +1,4 @@
-"""MCP server package for promptcache."""
+"""MCP server package for inferencache."""
 
 __all__ = ["main"]
 

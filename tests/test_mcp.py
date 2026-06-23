@@ -13,8 +13,8 @@ import time
 import pytest
 from pathlib import Path
 
-from promptcache.store import CacheEntry, CacheStore
-from promptcache.mcp.tools import (
+from inferencache.store import CacheEntry, CacheStore
+from inferencache.mcp.tools import (
     tool_clear_cache,
     tool_get_cached_entry,
     tool_get_stats,

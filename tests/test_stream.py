@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import pytest
 
-from promptcache.engine import CacheConfig, CacheEngine
+from inferencache.engine import CacheConfig, CacheEngine
 
 
 class _FakeEmbedder:
@@ -134,7 +134,7 @@ def test_stream_cache_hit_via_decorator(tmp_path):
     Verify that the @cache(streaming=True) decorator yields chunks from
     the cache on a second call rather than invoking the underlying function.
     """
-    from promptcache import CacheConfig, cache
+    from inferencache import CacheConfig, cache
 
     call_count = 0
 
@@ -167,7 +167,7 @@ async def test_stream_async_decorator(tmp_path):
     """
     Verify the async @cache decorator works for non-streaming async functions.
     """
-    from promptcache import CacheConfig, cache
+    from inferencache import CacheConfig, cache
 
     call_count = 0
 

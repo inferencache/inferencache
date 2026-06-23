@@ -94,7 +94,7 @@ class SentenceTransformerEmbedder:
             except ImportError as exc:
                 raise ImportError(
                     "sentence-transformers is required for the default embedder. "
-                    "Install it with: pip install promptcache[embed]"
+                    "Install it with: pip install inferencache[embed]"
                 ) from exc
             self._model = SentenceTransformer(self._model_name)
         return self._model
@@ -188,7 +188,7 @@ class Qwen3Embedder:
             except ImportError as exc:
                 raise ImportError(
                     "sentence-transformers is required for Qwen3Embedder. "
-                    "Install it with: pip install promptcache[embed]"
+                    "Install it with: pip install inferencache[embed]"
                 ) from exc
             self._model = SentenceTransformer(self._model_name)
         return self._model.encode(text, normalize_embeddings=True).tolist()

@@ -1,5 +1,5 @@
 """
-promptcache — Semantic LLM response caching.
+inferencache — Semantic LLM response caching.
 
 Drop-in caching for any LLM API call. Two checks before the request
 ever leaves your machine: exact match (SHA-256, sub-ms) then semantic
@@ -7,7 +7,7 @@ match (embedding + cosine similarity). Zero external services required.
 
 Quickstart::
 
-    from promptcache import cache, CacheConfig
+    from inferencache import cache, CacheConfig
 
     @cache(config=CacheConfig(model="gpt-4o"))
     def ask(prompt: str) -> str:
@@ -21,7 +21,7 @@ Quickstart::
 
 Context manager usage::
 
-    from promptcache import cache_context, CacheConfig
+    from inferencache import cache_context, CacheConfig
 
     with cache_context(prompt, config=CacheConfig(model="gpt-4o")) as ctx:
         if ctx.hit:

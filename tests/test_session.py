@@ -8,9 +8,9 @@ import time
 
 import pytest
 
-from promptcache.engine import CacheConfig, CacheEngine
-from promptcache.session import SessionAwareLookup
-from promptcache.store import CacheEntry
+from inferencache.engine import CacheConfig, CacheEngine
+from inferencache.session import SessionAwareLookup
+from inferencache.store import CacheEntry
 
 
 class FakeEmbedder:

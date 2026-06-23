@@ -1,19 +1,19 @@
 """
-mcp/server.py — MCP server for promptcache.
+mcp/server.py — MCP server for inferencache.
 
 Exposes cache internals as MCP tools so AI coding assistants (Cursor,
 Windsurf, Claude Code) can inspect and manage the cache without the
 developer leaving their editor.
 
-Install: pip install promptcache[mcp]
-Run:     promptcache-mcp
+Install: pip install inferencache[mcp]
+Run:     inferencache-mcp
 Config:  claude_desktop_config.json or .cursor/mcp.json
 
   {
     "mcpServers": {
-      "promptcache": {
-        "command": "promptcache-mcp",
-        "args": ["--cache-dir", "~/.cache/promptcache"]
+      "inferencache": {
+        "command": "inferencache-mcp",
+        "args": ["--cache-dir", "~/.cache/inferencache"]
       }
     }
   }
@@ -39,8 +39,8 @@ try:
     from mcp import types
 except ImportError as exc:
     raise ImportError(
-        "The MCP package is required for the promptcache MCP server. "
-        "Install it with: pip install promptcache[mcp]"
+        "The MCP package is required for the inferencache MCP server. "
+        "Install it with: pip install inferencache[mcp]"
     ) from exc
 
 from .tools import (
@@ -55,10 +55,10 @@ from .tools import (
 # Server definition
 # ---------------------------------------------------------------------------
 
-app = Server("promptcache")
+app = Server("inferencache")
 
 # Global state shared by tool handlers
-_cache_dir: Path = Path.home() / ".cache" / "promptcache"
+_cache_dir: Path = Path.home() / ".cache" / "inferencache"
 _threshold: float = 0.85
 
 
@@ -227,13 +227,13 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="promptcache-mcp",
-        description="promptcache MCP server — expose cache tools to AI coding assistants",
+        prog="inferencache-mcp",
+        description="inferencache MCP server — expose cache tools to AI coding assistants",
     )
     parser.add_argument(
         "--cache-dir",
-        default=str(Path.home() / ".cache" / "promptcache"),
-        help="Path to the promptcache data directory",
+        default=str(Path.home() / ".cache" / "inferencache"),
+        help="Path to the inferencache data directory",
     )
     parser.add_argument(
         "--threshold",

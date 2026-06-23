@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from promptcache.analytics import CacheAnalytics
-from promptcache.store import CacheEntry, CacheStore
+from inferencache.analytics import CacheAnalytics
+from inferencache.store import CacheEntry, CacheStore
 
 MODEL = "gpt-4o-mini"
 PROVIDER = "openai"

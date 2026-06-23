@@ -13,7 +13,7 @@ from pathlib import Path
 from ..analytics import CacheAnalytics
 from ..engine import CacheConfig, CacheEngine
 
-_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "promptcache"
+_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "inferencache"
 
 _cache_dir: Path = _DEFAULT_CACHE_DIR
 _engines: dict[str, CacheEngine] = {}

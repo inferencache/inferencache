@@ -1,5 +1,5 @@
 """
-analytics.py — DuckDB analytics layer for promptcache.
+analytics.py — DuckDB analytics layer for inferencache.
 
 Reads the SQLite index.db (written by CacheStore) via DuckDB's sqlite
 extension. DuckDB is attached READ-ONLY so it never modifies the live
@@ -44,7 +44,7 @@ _DEFAULT_COST = 0.000005  # fallback: ~$5/M tokens
 
 class CacheAnalytics:
     """
-    OLAP analytics over the promptcache calls event log.
+    OLAP analytics over the inferencache calls event log.
 
     Attaches the SQLite index.db read-only so DuckDB never writes to it.
 

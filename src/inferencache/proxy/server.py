@@ -1,12 +1,11 @@
 """
-server.py — Main ASGI application for promptcache serve.
+server.py — Main ASGI application for inferencache serve.
 
 Routing:
   /v1/messages          → Anthropic API intercept
   /v1/chat/completions  → OpenAI API intercept
   /api/*                → Dashboard control REST API
-  /dashboard            → Next.js static build
-  /                     → redirect to /dashboard
+  /                     → Next.js static export (landing + dashboard)
 """
 
 from __future__ import annotations
@@ -16,8 +15,10 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+from inferencache.paths import default_cache_dir
 
 from .control import db as control_db
 from .control.router import router as control_router
@@ -25,7 +26,7 @@ from .forward import forward_request
 from .intercept import intercept, write_back
 from .state import broadcast_sse, init_state
 
-_DASHBOARD_DIR = Path(__file__).parent / "dashboard"
+_SITE_DIR = Path(__file__).parent / "site"
 
 
 def _count_tokens(text: str) -> int:
@@ -76,13 +77,13 @@ async def _emit_proxy_call(result, path: str) -> None:
 
 def create_app(
     cache_dir: Path | None = None,
-    serve_dashboard: bool = True,
+    serve_site: bool = True,
 ) -> FastAPI:
     if cache_dir is None:
-        cache_dir = Path.home() / ".cache" / "promptcache"
+        cache_dir = default_cache_dir()
     init_state(cache_dir)
 
-    app = FastAPI(title="promptcache", version="0.1.0", docs_url=None, redoc_url=None)
+    app = FastAPI(title="inferencache", version="0.1.0", docs_url=None, redoc_url=None)
 
     app.add_middleware(
         CORSMiddleware,
@@ -96,30 +97,6 @@ def create_app(
         control_db.ensure_schema()
 
     app.include_router(control_router)
-
-    if serve_dashboard and _DASHBOARD_DIR.exists():
-        app.mount(
-            "/dashboard",
-            StaticFiles(directory=str(_DASHBOARD_DIR), html=True),
-            name="dashboard",
-        )
-    elif serve_dashboard:
-
-        @app.get("/dashboard")
-        async def dashboard_not_built():
-            return JSONResponse(
-                {
-                    "error": (
-                        "Dashboard not built. Run: ./scripts/build-dashboard.sh "
-                        "or npm run build in promptcache-ui/frontend-next"
-                    )
-                },
-                status_code=503,
-            )
-
-    @app.get("/")
-    async def root():
-        return RedirectResponse(url="/dashboard")
 
     @app.api_route("/v1/messages", methods=["POST"], include_in_schema=False)
     @app.api_route("/v1/chat/completions", methods=["POST"], include_in_schema=False)
@@ -165,6 +142,26 @@ def create_app(
         del path
         return await forward_request(request)
 
+    if serve_site and _SITE_DIR.exists():
+        app.mount(
+            "/",
+            StaticFiles(directory=str(_SITE_DIR), html=True),
+            name="site",
+        )
+    elif serve_site:
+
+        @app.get("/")
+        async def site_not_built():
+            return JSONResponse(
+                {
+                    "error": (
+                        "Site not built. Run: ./scripts/build-dashboard.sh "
+                        "or npm run build in promptcache-dashboard/frontend-next"
+                    )
+                },
+                status_code=503,
+            )
+
     return app
 
 
@@ -172,8 +169,9 @@ def main() -> None:
     import uvicorn
 
     app = create_app()
-    print("\n  promptcache proxy  →  http://127.0.0.1:8080")
-    print("  dashboard          →  http://127.0.0.1:8080/dashboard\n")
+    print("\n  inferencache proxy  →  http://127.0.0.1:8080")
+    print("  landing             →  http://127.0.0.1:8080/")
+    print("  dashboard           →  http://127.0.0.1:8080/dashboard/\n")
     uvicorn.run(app, host="127.0.0.1", port=8080, log_level="warning")
 
 
