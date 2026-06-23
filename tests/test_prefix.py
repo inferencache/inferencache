@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pytest
 
-from promptcache.prefix import (
+from inferencache.prefix import (
     DYNAMIC_SYSTEM_PROMPT_INDICATORS,
     PrefixConfig,
     PrefixOptimizer,

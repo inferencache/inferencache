@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from promptcache.api import _engines, _flush_engines, cache, cache_context
-from promptcache.engine import CacheConfig
+from inferencache.api import _engines, _flush_engines, cache, cache_context
+from inferencache.engine import CacheConfig
 
 
 class FakeEmbedder:

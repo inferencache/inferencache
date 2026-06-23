@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from promptcache.router import (
+from inferencache.router import (
     THRESHOLDS,
     CallContext,
     PromptType,

@@ -1,11 +1,11 @@
 """
-cli.py — Command-line interface for promptcache.
+cli.py — Command-line interface for inferencache.
 
 Commands:
-    promptcache serve   — Start proxy server + embedded dashboard
-    promptcache stats   — Print hit rate, cost saved, top cached queries
-    promptcache clear   — Flush the cache (optionally by model)
-    promptcache config  — Show active configuration
+    inferencache serve   — Start proxy server + embedded dashboard
+    inferencache stats   — Print hit rate, cost saved, top cached queries
+    inferencache clear   — Flush the cache (optionally by model)
+    inferencache config  — Show active configuration
 """
 
 from __future__ import annotations
@@ -58,7 +58,8 @@ def _format_cost(dollars: float) -> str:
 
 
 def _default_cache_dir() -> Path:
-    return Path.home() / ".cache" / "promptcache"
+    from .paths import default_cache_dir
+    return default_cache_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
 
     if not cache_dir.exists():
         print(f"No cache found at {cache_dir}")
-        print("Run your app with promptcache enabled first.")
+        print("Run your app with inferencache enabled first.")
         return 1
 
     try:
@@ -124,7 +125,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
     )
 
     print()
-    print("  promptcache stats")
+    print("  inferencache stats")
     print("  " + "─" * 42)
     print(f"  Cache dir        {cache_dir}")
     print(f"  Entries stored   {stats.total_entries:,}")
@@ -196,14 +197,14 @@ def cmd_config(args: argparse.Namespace) -> int:
     cache_dir = Path(args.cache_dir)
 
     print()
-    print("  promptcache config")
+    print("  inferencache config")
     print("  " + "─" * 42)
     print(f"  cache_dir    {cache_dir}")
     print(f"  threshold    0.85  (default; override via CacheConfig)")
     print(f"  embedder     SentenceTransformerEmbedder(BAAI/bge-small-en-v1.5, preset=balanced)")
     print()
     print("  Override in code:")
-    print("    from promptcache import CacheConfig")
+    print("    from inferencache import CacheConfig")
     print("    config = CacheConfig(")
     print(f'        cache_dir="{cache_dir}",')
     print("        threshold=0.88,")
@@ -227,8 +228,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
         import uvicorn
     except ImportError as exc:
         print(
-            "promptcache serve requires the [serve] extra:\n"
-            '  pip install "promptcache[serve]"',
+            "inferencache serve requires the [serve] extra:\n"
+            '  pip install "inferencache[serve]"',
             file=sys.stderr,
         )
         raise SystemExit(1) from exc
@@ -243,7 +244,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     dashboard_url = f"http://{args.host}:{args.port}/dashboard"
     proxy_url = f"http://{args.host}:{args.port}"
 
-    print(f"\n  promptcache proxy  →  {proxy_url}")
+    print(f"\n  inferencache proxy  →  {proxy_url}")
     if not args.no_dashboard:
         print(f"  dashboard          →  {dashboard_url}\n")
 
@@ -266,13 +267,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="promptcache",
+        prog="inferencache",
         description="Semantic LLM response caching — inspect and manage your cache.",
     )
     parser.add_argument(
         "--cache-dir",
         default=str(_default_cache_dir()),
-        help="Path to cache directory (default: ~/.cache/promptcache)",
+        help="Path to cache directory (default: ~/.cache/inferencache)",
     )
 
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")

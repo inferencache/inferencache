@@ -13,7 +13,7 @@ import time
 import pytest
 from pathlib import Path
 
-from promptcache.store import CacheEntry, CacheStore, _hash_key
+from inferencache.store import CacheEntry, CacheStore, _hash_key
 
 
 # ---------------------------------------------------------------------------

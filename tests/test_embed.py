@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from promptcache.embed import (
+from inferencache.embed import (
     Embedder,
     Qwen3Embedder,
     SentenceTransformerEmbedder,

@@ -1,5 +1,5 @@
 """
-mcp/tools.py — Tool implementations for the promptcache MCP server.
+mcp/tools.py — Tool implementations for the inferencache MCP server.
 
 All functions here are pure: they take a cache_dir and args, open a
 CacheStore, do their work, and return a plain dict. This makes them
@@ -66,7 +66,7 @@ def tool_get_stats(
             "total_entries": 0,
             "total_hits": 0,
             "hit_rate": 0.0,
-            "message": f"No cache found at {cache_dir}. Run your app with promptcache enabled first.",
+            "message": f"No cache found at {cache_dir}. Run your app with inferencache enabled first.",
         }
 
     store = _open_store(cache_dir)

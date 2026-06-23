@@ -1,7 +1,7 @@
 """
 tests/test_cli.py
 
-Tests for promptcache CLI commands: stats, clear, config.
+Tests for inferencache CLI commands: stats, clear, config.
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from promptcache.cli import main
-from promptcache.store import CacheEntry, CacheStore
+from inferencache.cli import main
+from inferencache.store import CacheEntry, CacheStore
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def test_stats_human_readable(populated_cache, capsys):
         main(["--cache-dir", str(populated_cache), "stats"])
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    assert "promptcache stats" in out
+    assert "inferencache stats" in out
     assert "Hit rate" in out
 
 
@@ -67,7 +67,7 @@ def test_config(capsys):
         main(["--cache-dir", "/tmp/test-cache", "config"])
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    assert "promptcache config" in out
+    assert "inferencache config" in out
     assert "/tmp/test-cache" in out
     assert "CacheConfig" in out
 

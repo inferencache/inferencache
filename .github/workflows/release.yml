@@ -17,8 +17,8 @@ jobs:
       - name: Checkout dashboard frontend
         uses: actions/checkout@v4
         with:
-          repository: lavondev/promptcache-ui
-          path: promptcache-dashboard
+          repository: lavondev/inferencache-ui
+          path: inferencache-dashboard
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node
@@ -26,13 +26,15 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: promptcache-dashboard/frontend-next/package-lock.json
+          cache-dependency-path: inferencache-dashboard/frontend-next/package-lock.json
 
       - name: Build and embed dashboard
         env:
-          DASHBOARD_REPO: ${{ github.workspace }}/promptcache-dashboard
-          PROMPTCACHE_REPO: ${{ github.workspace }}
-        run: ./scripts/build-dashboard.sh
+          DASHBOARD_REPO: ${{ github.workspace }}/inferencache-dashboard
+          INFERENCACHE_REPO: ${{ github.workspace }}
+        run: |
+          ./scripts/ensure-site-dir.sh
+          ./scripts/build-dashboard.sh
 
       - name: Set up Python
         uses: actions/setup-python@v5

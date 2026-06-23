@@ -14,8 +14,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from promptcache.engine import CacheConfig, CacheEngine, CacheResult
-from promptcache.embed import Embedder
+from inferencache.engine import CacheConfig, CacheEngine, CacheResult
+from inferencache.embed import Embedder
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ class FakeEmbedder:
 
 @pytest.fixture
 def tmp_cache_dir(tmp_path):
-    return tmp_path / "promptcache_test"
+    return tmp_path / "inferencache_test"
 
 
 @pytest.fixture

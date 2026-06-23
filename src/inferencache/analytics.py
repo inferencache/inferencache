@@ -1,5 +1,5 @@
 """
-analytics.py — DuckDB analytics layer for promptcache.
+analytics.py — DuckDB analytics layer for inferencache.
 
 Reads the SQLite index.db (written by CacheStore) via DuckDB's sqlite
 extension. DuckDB is attached READ-ONLY so it never modifies the live
@@ -11,6 +11,7 @@ serialisation.
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -44,7 +45,7 @@ _DEFAULT_COST = 0.000005  # fallback: ~$5/M tokens
 
 class CacheAnalytics:
     """
-    OLAP analytics over the promptcache calls event log.
+    OLAP analytics over the inferencache calls event log.
 
     Attaches the SQLite index.db read-only so DuckDB never writes to it.
 
@@ -61,6 +62,7 @@ class CacheAnalytics:
     ) -> None:
         self._db_path = Path(cache_dir) / "index.db"
         self._costs = {**_MODEL_COSTS, **(extra_costs or {})}
+        self._lock = threading.Lock()
         self._conn = self._init_duckdb()
 
     # ------------------------------------------------------------------
@@ -120,9 +122,10 @@ class CacheAnalytics:
         if not self._db_path.exists():
             return []
         try:
-            result = self._conn.execute(sql, params or [])
-            cols = [d[0] for d in result.description]
-            return [dict(zip(cols, row)) for row in result.fetchall()]
+            with self._lock:
+                result = self._conn.execute(sql, params or [])
+                cols = [d[0] for d in result.description]
+                return [dict(zip(cols, row)) for row in result.fetchall()]
         except Exception:
             return []
 

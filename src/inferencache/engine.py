@@ -34,7 +34,7 @@ __all__ = ["CacheEngine", "CacheConfig", "CacheResult"]
 # Configuration
 # ---------------------------------------------------------------------------
 
-_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "promptcache"
+_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "inferencache"
 _DEFAULT_THRESHOLD = 0.85
 _DEFAULT_STREAM_CHUNK_SIZE = 32
 _DEFAULT_STREAM_DELAY = 0.0

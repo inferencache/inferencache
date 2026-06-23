@@ -3,7 +3,7 @@ api.py — Public API: @cache decorator and cache_context() context manager.
 
 This is the only module users need to import. Everything else is internal.
 
-    from promptcache import cache, CacheConfig
+    from inferencache import cache, CacheConfig
 
     config = CacheConfig(model="gpt-4o", threshold=0.88)
 
@@ -138,7 +138,7 @@ def cache(
 
     Args:
         config: CacheConfig instance. If None, uses global defaults
-                (cache_dir=~/.cache/promptcache, threshold=0.85).
+                (cache_dir=~/.cache/inferencache, threshold=0.85).
         prompt_arg: Name of the function argument that contains the
                     prompt string. Default: 'prompt'.
         streaming: Set True if the wrapped function returns a Generator

@@ -1,7 +1,7 @@
 """
-SQLite persistence for promptcache dashboard run history.
+SQLite persistence for inferencache dashboard run history.
 
-DB location: ~/.cache/promptcache/runs.db
+DB location: ~/.cache/inferencache/runs.db
 """
 
 from __future__ import annotations
