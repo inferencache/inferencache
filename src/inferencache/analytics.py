@@ -155,6 +155,7 @@ class CacheAnalytics:
                 FLOOR(timestamp / {bucket_secs}) * {bucket_secs}  AS time_bucket,
                 COUNT(*) FILTER (WHERE hit_type = 'exact')          AS exact_hits,
                 COUNT(*) FILTER (WHERE hit_type = 'semantic')       AS semantic_hits,
+                COUNT(*) FILTER (WHERE hit_type = 'generative')     AS generative_hits,
                 COUNT(*) FILTER (WHERE hit_type = 'miss')           AS misses,
                 COUNT(*)                                             AS total_calls
             FROM cache.calls
@@ -184,13 +185,25 @@ class CacheAnalytics:
             """
             SELECT
                 timestamp,
-                CASE WHEN hit_type != 'miss'
-                    THEN COALESCE(tokens_output, 200) * model_cost_per_token(model)
+                CASE
+                    WHEN hit_type = 'generative' THEN
+                        COALESCE(tier1_cached_input_tokens, 200)
+                            * model_cost_per_token(model)
+                        - COALESCE(adaptation_cost_usd, 0.0)
+                    WHEN hit_type NOT IN ('miss', 'stale_miss') THEN
+                        COALESCE(tier1_cached_input_tokens, tokens_output, 200)
+                            * model_cost_per_token(model)
                     ELSE 0.0
                 END AS cost_saved,
                 SUM(
-                    CASE WHEN hit_type != 'miss'
-                        THEN COALESCE(tokens_output, 200) * model_cost_per_token(model)
+                    CASE
+                        WHEN hit_type = 'generative' THEN
+                            COALESCE(tier1_cached_input_tokens, 200)
+                                * model_cost_per_token(model)
+                            - COALESCE(adaptation_cost_usd, 0.0)
+                        WHEN hit_type NOT IN ('miss', 'stale_miss') THEN
+                            COALESCE(tier1_cached_input_tokens, tokens_output, 200)
+                                * model_cost_per_token(model)
                         ELSE 0.0
                     END
                 ) OVER (ORDER BY timestamp) AS cumulative_saved
@@ -222,15 +235,21 @@ class CacheAnalytics:
             SELECT
                 COALESCE(endpoint, 'unknown')                       AS endpoint,
                 COUNT(*)                                            AS total_calls,
-                COUNT(*) FILTER (WHERE hit_type != 'miss')         AS cache_hits,
+                COUNT(*) FILTER (WHERE hit_type != 'miss' AND hit_type != 'stale_miss') AS cache_hits,
                 ROUND(
-                    COUNT(*) FILTER (WHERE hit_type != 'miss') * 1.0 / COUNT(*), 4
+                    COUNT(*) FILTER (WHERE hit_type NOT IN ('miss', 'stale_miss')) * 1.0 / COUNT(*), 4
                 )                                                   AS hit_rate,
                 ROUND(AVG(latency_ms), 1)                          AS avg_latency_ms,
                 ROUND(SUM(COALESCE(cost_usd, 0.0)), 8)             AS total_cost_usd,
                 ROUND(SUM(
-                    CASE WHEN hit_type != 'miss'
-                        THEN COALESCE(tokens_output, 200) * model_cost_per_token(model)
+                    CASE
+                        WHEN hit_type = 'generative' THEN
+                            COALESCE(tier1_cached_input_tokens, 200)
+                                * model_cost_per_token(model)
+                            - COALESCE(adaptation_cost_usd, 0.0)
+                        WHEN hit_type NOT IN ('miss', 'stale_miss') THEN
+                            COALESCE(tier1_cached_input_tokens, tokens_output, 200)
+                                * model_cost_per_token(model)
                         ELSE 0.0
                     END
                 ), 8)                                               AS cost_saved_usd
@@ -264,9 +283,11 @@ class CacheAnalytics:
             f"""
             SELECT
                 FLOOR(similarity * {int(buckets)}) / {int(buckets)} AS bucket_floor,
+                COUNT(*) FILTER (WHERE hit_type = 'semantic')       AS semantic_count,
+                COUNT(*) FILTER (WHERE hit_type = 'generative')     AS generative_count,
                 COUNT(*)                                             AS count
             FROM cache.calls
-            WHERE hit_type = 'semantic'
+            WHERE hit_type IN ('semantic', 'generative')
               AND model = ?
               AND timestamp > ?
               AND similarity IS NOT NULL
@@ -369,6 +390,102 @@ class CacheAnalytics:
             "cost_rate": {"status": c_status,   "hourly_usd": round(hourly_usd, 6)},
         }
 
+    def stale_miss_rate(
+        self,
+        model: str,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """
+        Returns counts of stale_miss events vs regular misses.
+
+        Useful for tuning TTL windows — if stale_miss rate is high,
+        TIME_WINDOWED entries are expiring too fast.
+        """
+        now = int(time.time())
+        cutoff = now - window_hours * 3600
+
+        rows = self._q(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE hit_type = 'stale_miss') AS stale_misses,
+                COUNT(*) FILTER (WHERE hit_type = 'miss')       AS regular_misses,
+                COUNT(*) FILTER (WHERE hit_type IN ('miss', 'stale_miss')) AS total_misses
+            FROM cache.calls
+            WHERE timestamp > ?
+              AND model = ?
+            """,
+            [cutoff, model],
+        )
+
+        if not rows:
+            return {
+                "stale_misses": 0,
+                "regular_misses": 0,
+                "total_misses": 0,
+                "stale_miss_rate": 0.0,
+            }
+
+        row = rows[0]
+        stale_misses = int(row.get("stale_misses") or 0)
+        regular_misses = int(row.get("regular_misses") or 0)
+        total_misses = int(row.get("total_misses") or 0)
+        rate = stale_misses / total_misses if total_misses > 0 else 0.0
+
+        return {
+            "stale_misses": stale_misses,
+            "regular_misses": regular_misses,
+            "total_misses": total_misses,
+            "stale_miss_rate": round(rate, 4),
+        }
+
+    def generative_hit_rate(
+        self,
+        model: str,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """Return generative hit counts and rate for the analytics window."""
+        now = int(time.time())
+        cutoff = now - window_hours * 3600
+
+        rows = self._q(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE hit_type = 'generative') AS generative_hits,
+                COUNT(*) FILTER (WHERE hit_type = 'exact')    AS exact_hits,
+                COUNT(*) FILTER (WHERE hit_type = 'semantic') AS semantic_hits,
+                COUNT(*) FILTER (WHERE hit_type = 'miss')     AS misses,
+                COUNT(*)                                        AS total_calls
+            FROM cache.calls
+            WHERE timestamp > ?
+              AND model = ?
+            """,
+            [cutoff, model],
+        )
+
+        if not rows:
+            return {
+                "generative_hits": 0,
+                "exact_hits": 0,
+                "semantic_hits": 0,
+                "misses": 0,
+                "total_calls": 0,
+                "generative_hit_rate": 0.0,
+            }
+
+        row = rows[0]
+        total = int(row.get("total_calls") or 0)
+        generative = int(row.get("generative_hits") or 0)
+        rate = generative / total if total > 0 else 0.0
+
+        return {
+            "generative_hits": generative,
+            "exact_hits": int(row.get("exact_hits") or 0),
+            "semantic_hits": int(row.get("semantic_hits") or 0),
+            "misses": int(row.get("misses") or 0),
+            "total_calls": total,
+            "generative_hit_rate": round(rate, 4),
+        }
+
     def false_positive_queue(
         self,
         model: str,
@@ -419,16 +536,21 @@ class CacheAnalytics:
             """
             SELECT
                 COALESCE(SUM(tier1_cached_input_tokens)
-                    FILTER (WHERE hit_type IN ('exact', 'semantic')), 0)
+                    FILTER (WHERE hit_type IN ('exact', 'semantic', 'generative')), 0)
                     AS tier1_tokens,
                 COALESCE(SUM(
-                    CASE WHEN hit_type IN ('exact', 'semantic')
-                        THEN COALESCE(tier1_cached_input_tokens, 0)
-                            * model_cost_per_token(model)
+                    CASE
+                        WHEN hit_type = 'generative' THEN
+                            COALESCE(tier1_cached_input_tokens, 0)
+                                * model_cost_per_token(model)
+                            - COALESCE(adaptation_cost_usd, 0.0)
+                        WHEN hit_type IN ('exact', 'semantic') THEN
+                            COALESCE(tier1_cached_input_tokens, 0)
+                                * model_cost_per_token(model)
                         ELSE 0.0
                     END
                 ), 0.0) AS tier1_cost,
-                COUNT(*) FILTER (WHERE hit_type IN ('exact', 'semantic'))
+                COUNT(*) FILTER (WHERE hit_type IN ('exact', 'semantic', 'generative'))
                     AS tier1_hits,
                 COALESCE(SUM(tier2_cached_input_tokens)
                     FILTER (WHERE tokens_input IS NOT NULL

@@ -14,6 +14,7 @@ from enum import Enum
 __all__ = [
     "PromptType",
     "THRESHOLDS",
+    "GENERATIVE_ZONES",
     "CallContext",
     "TierDecision",
     "TierRouter",
@@ -32,6 +33,13 @@ THRESHOLDS: dict[PromptType, float] = {
     PromptType.DETERMINISTIC: 0.95,
     PromptType.RAG: 0.88,
     PromptType.CONVERSATIONAL: 0.82,
+}
+
+GENERATIVE_ZONES: dict[PromptType, dict[str, float]] = {
+    PromptType.CODE: {"gen_floor": 0.78, "threshold": 0.92},
+    PromptType.DETERMINISTIC: {"gen_floor": 0.82, "threshold": 0.95},
+    PromptType.RAG: {"gen_floor": 0.72, "threshold": 0.88},
+    PromptType.CONVERSATIONAL: {"gen_floor": 0.68, "threshold": 0.82},
 }
 
 _CODE_PATTERNS = [

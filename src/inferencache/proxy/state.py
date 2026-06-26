@@ -74,6 +74,23 @@ def all_engines() -> dict[str, CacheEngine]:
     return _engines
 
 
+def prune_expired_on_startup() -> int:
+    """Prune expired cache entries from index.db on proxy startup."""
+    from ..embed import get_embedder
+    from ..store import CacheStore
+
+    embedder = get_embedder("balanced")
+    store = CacheStore(
+        cache_dir=_cache_dir,
+        collection_name="_startup_prune",
+        embedding_dim=len(embedder.embed("x")),
+    )
+    try:
+        return store.prune_expired()
+    finally:
+        store.close()
+
+
 async def broadcast_sse(msg: str) -> None:
     for q in list(_client_queues):
         await q.put(msg)
