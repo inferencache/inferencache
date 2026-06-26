@@ -16,7 +16,7 @@ def _counterfactual_hit_rate(calls: list[dict], threshold: float) -> float:
     semantic = sum(
         1
         for c in calls
-        if c.get("hit_type") == "semantic"
+        if c.get("hit_type") in ("semantic", "generative")
         or (
             c.get("hit_type") == "miss"
             and (c.get("best_similarity") or c.get("similarity") or 0) >= threshold

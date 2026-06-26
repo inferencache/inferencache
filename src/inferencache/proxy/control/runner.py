@@ -542,6 +542,7 @@ async def _run_suite(config: RunConfig, run_id: str, emit: EmitFn) -> None:
         "cache_hits": 0,
         "exact_hits": 0,
         "semantic_hits": 0,
+        "generative_hits": 0,
         "total_tokens": 0,
         "total_cost_usd": 0.0,
         "total_time_ms": 0.0,
@@ -578,6 +579,8 @@ async def _run_suite(config: RunConfig, run_id: str, emit: EmitFn) -> None:
             summary["cache_hits"] += 1
             if result.hit_type == "exact":
                 summary["exact_hits"] += 1
+            elif result.hit_type == "generative":
+                summary["generative_hits"] += 1
             else:
                 summary["semantic_hits"] += 1
         else:
@@ -667,9 +670,12 @@ async def _run_suite(config: RunConfig, run_id: str, emit: EmitFn) -> None:
             "session_id": run_id,
             "matched_prompt": (
                 result.entry.prompt
-                if result.hit_type == "semantic" and result.entry
+                if result.hit_type in ("semantic", "generative") and result.entry
                 else None
             ),
+            "adaptation_model": result.adaptation_model,
+            "adaptation_tokens_in": result.adaptation_tokens_in,
+            "adaptation_tokens_out": result.adaptation_tokens_out,
             "tier1_hit": result.hit or result.tier1_hit,
             "tier2_cached_tokens": tier2_cached_tokens,
             "tier3_hit": tier3_hit,
@@ -685,10 +691,20 @@ async def _run_suite(config: RunConfig, run_id: str, emit: EmitFn) -> None:
     tokens_saved = 0
     cost_saved = 0.0
     for rec in call_records:
-        if rec.get("hit") and rec.get("hit_type") != "miss":
+        if rec.get("hit") and rec.get("hit_type") not in ("miss", "stale_miss"):
             tok = rec.get("tokens_used") or 200
             tokens_saved += tok
-            cost_saved += tok * cpt
+            avoided = tok * cpt
+            if rec.get("hit_type") == "generative":
+                adapt_model = rec.get("adaptation_model") or "gpt-4o-mini"
+                adapt_cpt = MODEL_COSTS.get(adapt_model, 0.0000006)
+                adapt_tok = (
+                    (rec.get("adaptation_tokens_in") or 0)
+                    + (rec.get("adaptation_tokens_out") or 0)
+                )
+                cost_saved += max(0.0, avoided - adapt_tok * adapt_cpt)
+            else:
+                cost_saved += avoided
 
     final_summary = {
         **summary,

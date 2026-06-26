@@ -223,6 +223,10 @@ class CacheStore:
         tier3_hit: int | None = None,
         tier2_cost_saved: float | None = None,
         tier3_cost_saved: float | None = None,
+        adaptation_model: str | None = None,
+        adaptation_tokens_in: int | None = None,
+        adaptation_tokens_out: int | None = None,
+        adaptation_cost_usd: float | None = None,
     ) -> int:
         """
         Insert one row into the calls event log.
@@ -240,8 +244,10 @@ class CacheStore:
                     tokens_input, tokens_output, cost_usd,
                     tier1_cached_input_tokens, tier2_cached_input_tokens,
                     tier3_hit, tier2_cost_saved, tier3_cost_saved,
+                    adaptation_model, adaptation_tokens_in,
+                    adaptation_tokens_out, adaptation_cost_usd,
                     timestamp
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     prompt_hash, model, provider, endpoint, session_id,
@@ -253,6 +259,10 @@ class CacheStore:
                     tier3_hit or 0,
                     tier2_cost_saved or 0.0,
                     tier3_cost_saved or 0.0,
+                    adaptation_model,
+                    adaptation_tokens_in,
+                    adaptation_tokens_out,
+                    adaptation_cost_usd,
                     time.time(),
                 ),
             )
@@ -640,6 +650,10 @@ class CacheStore:
             ("tier3_hit", "INTEGER NOT NULL DEFAULT 0"),
             ("tier2_cost_saved", "REAL DEFAULT 0"),
             ("tier3_cost_saved", "REAL DEFAULT 0"),
+            ("adaptation_model", "TEXT"),
+            ("adaptation_tokens_in", "INTEGER"),
+            ("adaptation_tokens_out", "INTEGER"),
+            ("adaptation_cost_usd", "REAL"),
         ],
     }
 
