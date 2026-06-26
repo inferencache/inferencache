@@ -369,6 +369,54 @@ class CacheAnalytics:
             "cost_rate": {"status": c_status,   "hourly_usd": round(hourly_usd, 6)},
         }
 
+    def stale_miss_rate(
+        self,
+        model: str,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """
+        Returns counts of stale_miss events vs regular misses.
+
+        Useful for tuning TTL windows — if stale_miss rate is high,
+        TIME_WINDOWED entries are expiring too fast.
+        """
+        now = int(time.time())
+        cutoff = now - window_hours * 3600
+
+        rows = self._q(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE hit_type = 'stale_miss') AS stale_misses,
+                COUNT(*) FILTER (WHERE hit_type = 'miss')       AS regular_misses,
+                COUNT(*) FILTER (WHERE hit_type IN ('miss', 'stale_miss')) AS total_misses
+            FROM cache.calls
+            WHERE timestamp > ?
+              AND model = ?
+            """,
+            [cutoff, model],
+        )
+
+        if not rows:
+            return {
+                "stale_misses": 0,
+                "regular_misses": 0,
+                "total_misses": 0,
+                "stale_miss_rate": 0.0,
+            }
+
+        row = rows[0]
+        stale_misses = int(row.get("stale_misses") or 0)
+        regular_misses = int(row.get("regular_misses") or 0)
+        total_misses = int(row.get("total_misses") or 0)
+        rate = stale_misses / total_misses if total_misses > 0 else 0.0
+
+        return {
+            "stale_misses": stale_misses,
+            "regular_misses": regular_misses,
+            "total_misses": total_misses,
+            "stale_miss_rate": round(rate, 4),
+        }
+
     def false_positive_queue(
         self,
         model: str,

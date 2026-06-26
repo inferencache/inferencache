@@ -27,6 +27,7 @@ from .prefix import PrefixConfig, PrefixOptimizer
 from .router import CallContext, TierRouter
 from .session import SessionAwareLookup
 from .store import CacheEntry, CacheStore, _hash_key
+from .ttl import DEFAULT_POLICIES, TTLClass, TTLClassifier
 
 __all__ = ["CacheEngine", "CacheConfig", "CacheResult"]
 
@@ -110,7 +111,7 @@ class CacheResult:
 
     Attributes:
         hit: True if a cached response was found (exact or semantic).
-        hit_type: 'exact', 'semantic', or 'miss'.
+        hit_type: 'exact', 'semantic', 'miss', or 'stale_miss'.
         response: The cached response string if hit=True, else None.
         similarity: Cosine similarity score for semantic hits; 1.0 for
                     exact hits; 0.0 for misses.
@@ -130,7 +131,7 @@ class CacheResult:
     """
 
     hit: bool
-    hit_type: str  # 'exact' | 'semantic' | 'miss'
+    hit_type: str  # 'exact' | 'semantic' | 'miss' | 'stale_miss'
     response: str | None = None
     similarity: float = 0.0
     best_similarity: float = 0.0
@@ -176,6 +177,7 @@ class CacheEngine:
         self._session_lookup = SessionAwareLookup(
             self._store, self._config.embedder
         )
+        self._ttl_classifier = TTLClassifier()
 
     # ------------------------------------------------------------------
     # Public interface
@@ -240,6 +242,17 @@ class CacheEngine:
             prompt, self._config.model, session_hash=session_hash
         )
         if entry is not None:
+            if not self._is_valid(entry, session_id):
+                return self._stale_miss_result(
+                    prompt=prompt,
+                    entry=entry,
+                    t0=t0,
+                    effective_endpoint=effective_endpoint,
+                    session_id=session_id,
+                    session_hash=session_hash,
+                    similarity=1.0,
+                    best_similarity=1.0,
+                )
             self._store.increment_hit(entry.prompt_hash, hit_type="exact")
             latency = round((time.perf_counter() - t0) * 1000, 2)
             tier1_tokens = self._estimate_output_tokens(entry.response)
@@ -280,6 +293,17 @@ class CacheEngine:
         passing = [(e, s) for e, s in all_hits if s >= effective_threshold]
         if passing:
             best_entry, score = passing[0]
+            if not self._is_valid(best_entry, session_id):
+                return self._stale_miss_result(
+                    prompt=prompt,
+                    entry=best_entry,
+                    t0=t0,
+                    effective_endpoint=effective_endpoint,
+                    session_id=session_id,
+                    session_hash=session_hash,
+                    similarity=score,
+                    best_similarity=score,
+                )
             self._store.increment_hit(best_entry.prompt_hash, hit_type="semantic")
             latency = round((time.perf_counter() - t0) * 1000, 2)
             tier1_tokens = self._estimate_output_tokens(best_entry.response)
@@ -369,6 +393,17 @@ class CacheEngine:
                 session_hash=session_hash,
             )
             if session_result.hit and session_result.entry is not None:
+                if not self._is_valid(session_result.entry, session_id):
+                    return self._stale_miss_result(
+                        prompt=prompt,
+                        entry=session_result.entry,
+                        t0=t0,
+                        effective_endpoint=effective_endpoint,
+                        session_id=session_id,
+                        session_hash=session_hash,
+                        similarity=session_result.similarity,
+                        best_similarity=session_result.best_similarity,
+                    )
                 self._store.increment_hit(
                     session_result.entry.prompt_hash,
                     hit_type=session_result.hit_type,
@@ -464,6 +499,7 @@ class CacheEngine:
         tier3_hit: int | None = None,
         tier2_cost_saved: float | None = None,
         tier3_cost_saved: float | None = None,
+        ttl_override: TTLClass | None = None,
     ) -> None:
         """
         Persist a (prompt, response) pair after a real API call.
@@ -498,11 +534,26 @@ class CacheEngine:
                 session_history
             )
 
+        ttl_class = ttl_override or self._ttl_classifier.classify(prompt)
+        if isinstance(ttl_class, str):
+            ttl_class = TTLClass(ttl_class)
+        policy = DEFAULT_POLICIES[ttl_class]
+        created_at = time.time()
+        expires_at = (
+            created_at + policy.max_age_secs
+            if policy.max_age_secs is not None
+            else None
+        )
+        if policy.session_bound and session_id is not None:
+            entry_metadata["session_id"] = session_id
+
         entry = CacheEntry(
             prompt=prompt,
             model=self._config.model,
             response=response,
-            created_at=time.time(),
+            created_at=created_at,
+            ttl_class=ttl_class.value,
+            expires_at=expires_at,
             metadata=entry_metadata or None,
         )
 
@@ -639,3 +690,61 @@ class CacheEngine:
     def _estimate_output_tokens(response: str) -> int:
         """Rough output token estimate for Tier 1 savings attribution."""
         return max(1, len(response) // 4)
+
+    def _is_valid(
+        self,
+        entry: CacheEntry,
+        current_session_id: str | None,
+    ) -> bool:
+        """
+        Returns False if the entry should be treated as a miss
+        due to expiry or session mismatch.
+        """
+        now = time.time()
+
+        if entry.expires_at is not None and now > entry.expires_at:
+            return False
+
+        if entry.ttl_class == TTLClass.SESSION.value:
+            entry_session = (entry.metadata or {}).get("session_id")
+            if entry_session and current_session_id:
+                if entry_session != current_session_id:
+                    return False
+
+        return True
+
+    def _stale_miss_result(
+        self,
+        *,
+        prompt: str,
+        entry: CacheEntry,
+        t0: float,
+        effective_endpoint: str | None,
+        session_id: str | None,
+        session_hash: str | None,
+        similarity: float,
+        best_similarity: float,
+    ) -> CacheResult:
+        """Treat an expired or session-mismatched hit as a stale miss."""
+        self._store.record_miss()
+        latency = round((time.perf_counter() - t0) * 1000, 2)
+        call_id = self._store.write_call_event(
+            prompt_hash=entry.prompt_hash,
+            model=self._config.model,
+            provider=self._config.provider,
+            hit_type="stale_miss",
+            latency_ms=latency,
+            endpoint=effective_endpoint,
+            session_id=session_id,
+            session_hash=session_hash,
+            similarity=similarity,
+        )
+        return CacheResult(
+            hit=False,
+            hit_type="stale_miss",
+            similarity=similarity,
+            best_similarity=best_similarity,
+            entry=entry,
+            latency_ms=latency,
+            call_id=call_id,
+        )

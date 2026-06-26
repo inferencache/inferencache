@@ -240,3 +240,18 @@ def test_tier_breakdown_empty_window(tmp_path):
     a.close()
     assert len(rows) == 3
     assert all(r["tokens_saved"] == 0 for r in rows)
+
+
+def test_stale_miss_rate(seeded_store, analytics):
+    store = seeded_store
+    store.write_call_event(
+        prompt_hash="stale_hash",
+        model=MODEL,
+        provider=PROVIDER,
+        hit_type="stale_miss",
+        latency_ms=4.0,
+    )
+    result = analytics.stale_miss_rate(MODEL, window_hours=24)
+    assert result["stale_misses"] >= 1
+    assert result["total_misses"] >= result["stale_misses"]
+    assert 0.0 <= result["stale_miss_rate"] <= 1.0

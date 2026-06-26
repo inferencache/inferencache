@@ -36,6 +36,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Generator, Iterator
 
 from .engine import CacheConfig, CacheEngine, CacheResult
+from .ttl import TTLClass
 
 __all__ = [
     "cache",
@@ -85,23 +86,40 @@ class CacheContext:
         result (CacheResult): Full result object with latency etc.
     """
 
-    def __init__(self, prompt: str, result: CacheResult, engine: CacheEngine) -> None:
+    def __init__(
+        self,
+        prompt: str,
+        result: CacheResult,
+        engine: CacheEngine,
+        ttl_override: TTLClass | None = None,
+    ) -> None:
         self._prompt = prompt
         self._engine = engine
+        self._ttl_override = ttl_override
         self.result = result
         self.hit = result.hit
         self.hit_type = result.hit_type
         self.response = result.response
         self.similarity = result.similarity
 
-    def store(self, response: str, metadata: dict[str, Any] | None = None) -> None:
+    def store(
+        self,
+        response: str,
+        metadata: dict[str, Any] | None = None,
+        ttl_override: TTLClass | None = None,
+    ) -> None:
         """
         Persist the response from a real API call.
 
         Call this inside the cache_context() block when ctx.hit is False
         and you have the real API response in hand.
         """
-        self._engine.store(self._prompt, response, metadata=metadata)
+        self._engine.store(
+            self._prompt,
+            response,
+            metadata=metadata,
+            ttl_override=ttl_override or self._ttl_override,
+        )
 
     def stream(self) -> Iterator[str]:
         """
@@ -132,6 +150,7 @@ def cache(
     prompt_arg: str = "prompt",
     streaming: bool = False,
     metadata_fn: Callable[..., dict[str, Any]] | None = None,
+    ttl_override: TTLClass | None = None,
 ) -> Callable:
     """
     Decorator that wraps an LLM-calling function with semantic caching.
@@ -222,7 +241,12 @@ def cache(
 
                 full_response = "".join(chunks)
                 metadata = metadata_fn(*args, **kwargs) if metadata_fn else None
-                engine.store(prompt, full_response, metadata=metadata)
+                engine.store(
+                    prompt,
+                    full_response,
+                    metadata=metadata,
+                    ttl_override=ttl_override,
+                )
 
             return streaming_wrapper
 
@@ -239,7 +263,12 @@ def cache(
                 response = await fn(*args, **kwargs)
                 response_str = str(response)
                 metadata = metadata_fn(*args, **kwargs) if metadata_fn else None
-                engine.store(prompt, response_str, metadata=metadata)
+                engine.store(
+                    prompt,
+                    response_str,
+                    metadata=metadata,
+                    ttl_override=ttl_override,
+                )
                 return response
 
             return async_wrapper
@@ -257,7 +286,12 @@ def cache(
                 response = fn(*args, **kwargs)
                 response_str = str(response)
                 metadata = metadata_fn(*args, **kwargs) if metadata_fn else None
-                engine.store(prompt, response_str, metadata=metadata)
+                engine.store(
+                    prompt,
+                    response_str,
+                    metadata=metadata,
+                    ttl_override=ttl_override,
+                )
                 return response
 
             return sync_wrapper
@@ -274,6 +308,7 @@ def cache(
 def cache_context(
     prompt: str,
     config: CacheConfig | None = None,
+    ttl_override: TTLClass | None = None,
 ) -> Generator[CacheContext, None, None]:
     """
     Context manager for caching when you can't use the decorator.
@@ -301,5 +336,10 @@ def cache_context(
     _config = config or CacheConfig()
     engine = _get_engine(_config)
     result = engine.lookup(prompt)
-    ctx = CacheContext(prompt=prompt, result=result, engine=engine)
+    ctx = CacheContext(
+        prompt=prompt,
+        result=result,
+        engine=engine,
+        ttl_override=ttl_override,
+    )
     yield ctx

@@ -468,3 +468,45 @@ def test_hash_key_differs_by_prompt():
     h1 = _hash_key("prompt A", "model")
     h2 = _hash_key("prompt B", "model")
     assert h1 != h2
+
+
+def test_write_persists_ttl_fields(store):
+    entry = CacheEntry(
+        prompt="ephemeral prompt",
+        model="test-model",
+        response="response",
+        created_at=time.time(),
+        ttl_class="ephemeral",
+        expires_at=time.time() + 300,
+    )
+    store.write(entry)
+    found = store.get_exact(entry.prompt, entry.model)
+    assert found is not None
+    assert found.ttl_class == "ephemeral"
+    assert found.expires_at == entry.expires_at
+
+
+def test_prune_expired_deletes_old_entries(store):
+    expired = CacheEntry(
+        prompt="expired prompt",
+        model="test-model",
+        response="old response",
+        created_at=time.time() - 3600,
+        ttl_class="ephemeral",
+        expires_at=time.time() - 1,
+    )
+    fresh = CacheEntry(
+        prompt="fresh prompt",
+        model="test-model",
+        response="fresh response",
+        created_at=time.time(),
+        ttl_class="permanent",
+        expires_at=None,
+    )
+    store.write(expired)
+    store.write(fresh)
+
+    deleted = store.prune_expired()
+    assert deleted == 1
+    assert store.get_exact("expired prompt", "test-model") is None
+    assert store.get_exact("fresh prompt", "test-model") is not None

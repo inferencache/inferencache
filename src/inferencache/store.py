@@ -78,6 +78,12 @@ class CacheEntry:
     metadata: dict[str, Any] | None = None
     """Arbitrary metadata attached at write time."""
 
+    ttl_class: str = "permanent"
+    """TTLClass value stored at write time."""
+
+    expires_at: float | None = None
+    """Unix timestamp when entry expires; None = no time-based expiry."""
+
     def __post_init__(self) -> None:
         if not self.prompt_hash:
             self.prompt_hash = _hash_key(self.prompt, self.model)
@@ -432,6 +438,45 @@ class CacheStore:
 
         return result.rowcount
 
+    def prune_expired(self) -> int:
+        """
+        Delete entries past their expires_at. Returns count deleted.
+        Also removes corresponding Qdrant vectors.
+        """
+        now = time.time()
+        expired_rows = self._conn.execute(
+            "SELECT prompt_hash FROM entries WHERE expires_at IS NOT NULL AND expires_at < ?",
+            (now,),
+        ).fetchall()
+
+        if not expired_rows:
+            return 0
+
+        hashes = [row[0] for row in expired_rows]
+        placeholders = ",".join("?" * len(hashes))
+        with self._conn:
+            self._conn.execute(
+                f"DELETE FROM entries WHERE prompt_hash IN ({placeholders})",
+                hashes,
+            )
+
+        client = self._get_qdrant_client()
+        if client is not None:
+            try:
+                point_ids = [_qdrant_point_id(h) for h in hashes]
+                for col in client.get_collections().collections:
+                    try:
+                        client.delete(
+                            collection_name=col.name,
+                            points_selector=point_ids,
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        return len(hashes)
+
     def stats(self, top_n: int = 10) -> StoreStats:
         """Return aggregate statistics across the entire store."""
         row = self._conn.execute(
@@ -516,7 +561,9 @@ class CacheStore:
                 last_hit_type   TEXT,
                 metadata        TEXT,
                 endpoint        TEXT,
-                session_id      TEXT
+                session_id      TEXT,
+                ttl_class       TEXT NOT NULL DEFAULT 'permanent',
+                expires_at      REAL
             );
 
             CREATE INDEX IF NOT EXISTS idx_entries_model
@@ -569,6 +616,13 @@ class CacheStore:
             """
         )
         self._migrate_sqlite_schema(conn)
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_entries_expires_at
+                ON entries (expires_at)
+                WHERE expires_at IS NOT NULL
+            """
+        )
         conn.commit()
         return conn
 
@@ -576,6 +630,8 @@ class CacheStore:
         "entries": [
             ("endpoint", "TEXT"),
             ("session_id", "TEXT"),
+            ("ttl_class", "TEXT NOT NULL DEFAULT 'permanent'"),
+            ("expires_at", "REAL"),
         ],
         "calls": [
             ("session_hash", "TEXT"),
@@ -613,8 +669,9 @@ class CacheStore:
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO entries
-                    (prompt_hash, prompt, model, response, created_at, hit_count, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (prompt_hash, prompt, model, response, created_at, hit_count,
+                     metadata, ttl_class, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.prompt_hash,
@@ -624,6 +681,8 @@ class CacheStore:
                     entry.created_at,
                     entry.hit_count,
                     metadata_json,
+                    entry.ttl_class,
+                    entry.expires_at,
                 ),
             )
 
@@ -635,6 +694,10 @@ class CacheStore:
             except (json.JSONDecodeError, TypeError):
                 metadata = None
 
+        keys = row.keys()
+        ttl_class = row["ttl_class"] if "ttl_class" in keys else "permanent"
+        expires_at = row["expires_at"] if "expires_at" in keys else None
+
         return CacheEntry(
             prompt=row["prompt"],
             model=row["model"],
@@ -644,6 +707,8 @@ class CacheStore:
             prompt_hash=row["prompt_hash"],
             embedding_id=row["prompt_hash"],
             metadata=metadata,
+            ttl_class=ttl_class,
+            expires_at=expires_at,
         )
 
     def _reset_stats(self) -> None:

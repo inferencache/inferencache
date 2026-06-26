@@ -11,6 +11,7 @@ Routing:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -24,7 +25,9 @@ from .control import db as control_db
 from .control.router import router as control_router
 from .forward import forward_request
 from .intercept import intercept, write_back
-from .state import broadcast_sse, init_state
+from .state import broadcast_sse, init_state, prune_expired_on_startup
+
+_log = logging.getLogger(__name__)
 
 _SITE_DIR = Path(__file__).parent / "site"
 
@@ -95,6 +98,9 @@ def create_app(
     @app.on_event("startup")
     async def _startup() -> None:
         control_db.ensure_schema()
+        pruned = prune_expired_on_startup()
+        if pruned:
+            _log.info("Pruned %d expired cache entries on startup", pruned)
 
     app.include_router(control_router)
 

@@ -170,6 +170,19 @@ async def analytics_similarity_dist(
     return {"data": rows, "model": model, "window_hours": window_hours}
 
 
+@router.get("/analytics/stale-miss-rate")
+@router.get("/cache-stats/stale-miss-rate")
+async def analytics_stale_miss_rate(
+    model: str = "gpt-4o-mini",
+    window_hours: int = 24,
+):
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, get_analytics().stale_miss_rate, model, window_hours
+    )
+    return {"data": result, "model": model, "window_hours": window_hours}
+
+
 @router.get("/analytics/tier-breakdown")
 @router.get("/cache-stats/tier-breakdown")
 async def analytics_tier_breakdown(model: str = "gpt-4o-mini", window_hours: int = 24):
