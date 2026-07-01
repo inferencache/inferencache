@@ -33,9 +33,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lavondev/inferencache"
-Repository = "https://github.com/lavondev/inferencache"
-Issues = "https://github.com/lavondev/inferencache/issues"
+Homepage = "https://github.com/inferencache/inferencache"
+Repository = "https://github.com/inferencache/inferencache"
+Issues = "https://github.com/inferencache/inferencache/issues"
 
 [project.optional-dependencies]
 # Default embedder (sentence-transformers + torch)

@@ -30,3 +30,27 @@ jobs:
 
       - name: Lint
         run: ruff check src tests
+
+  verify-wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare site stub for packaging
+        run: |
+          ./scripts/ensure-site-dir.sh
+          echo '<html><body>stub</body></html>' > src/inferencache/proxy/site/index.html
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build
+
+      - name: Assert dashboard assets in wheel
+        run: |
+          unzip -l dist/*.whl | grep -q 'inferencache/proxy/site/index.html'

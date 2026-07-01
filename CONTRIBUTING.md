@@ -4,8 +4,8 @@
 
 | Repo | Purpose |
 |------|---------|
-| [lavondev/inferencache](https://github.com/lavondev/inferencache) | Python library, proxy server, embedded site assets |
-| [lavondev/inferencache-ui](https://github.com/lavondev/inferencache) | Next.js dashboard + landing (dev clone: `inferencache-dashboard`) |
+| [inferencache/inferencache](https://github.com/inferencache/inferencache) | Python library, proxy server, embedded site assets |
+| [inferencache/inferencache-ui](https://github.com/inferencache/inferencache-ui) | Next.js dashboard + landing (dev clone: `inferencache-dashboard`) |
 
 ## Local layout
 
@@ -21,7 +21,7 @@ SEMANTIC/
 ./inferencache/scripts/build-dashboard.sh
 ```
 
-Copies the Next static export to `src/inferencache/proxy/site/` (gitignored). Release builds run this before packaging; local dev can skip it — the proxy serves a JSON hint until the site is built.
+Copies the Next static export to `src/inferencache/proxy/site/` (gitignored). Tagged releases run this before packaging and bundle the dashboard in the wheel. Local dev can skip it — `inferencache serve` prints a warning and `/` returns 503 until the site is built.
 
 ## CLI
 
@@ -30,3 +30,5 @@ Copies the Next static export to `src/inferencache/proxy/site/` (gitignored). Re
 pip install -e ".[embed,serve,dev]"
 inferencache serve
 ```
+
+Use `inferencache serve --no-dashboard` for proxy-only mode without site routes.

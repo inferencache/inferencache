@@ -234,21 +234,34 @@ def cmd_serve(args: argparse.Namespace) -> int:
         )
         raise SystemExit(1) from exc
 
-    from .proxy.server import create_app
+    from .proxy.server import create_app, site_is_built
+
+    serve_site = not args.no_dashboard
+    dashboard_built = site_is_built()
+
+    if serve_site and not dashboard_built:
+        print(
+            "\n  WARNING: Dashboard site not built.\n"
+            "  Run: ./scripts/build-dashboard.sh\n"
+            "  (Proxy and /api still work; / returns 503 until the site is built.)\n",
+            file=sys.stderr,
+        )
 
     app = create_app(
         cache_dir=Path(args.cache_dir),
-        serve_dashboard=not args.no_dashboard,
+        serve_site=serve_site,
     )
 
     dashboard_url = f"http://{args.host}:{args.port}/dashboard"
     proxy_url = f"http://{args.host}:{args.port}"
 
     print(f"\n  inferencache proxy  →  {proxy_url}")
-    if not args.no_dashboard:
+    if serve_site and dashboard_built:
         print(f"  dashboard          →  {dashboard_url}\n")
+    elif serve_site:
+        print("  dashboard          →  (not built — see warning above)\n")
 
-    if not args.no_browser and not args.no_dashboard:
+    if not args.no_browser and serve_site and dashboard_built:
 
         def _open() -> None:
             time.sleep(1.2)

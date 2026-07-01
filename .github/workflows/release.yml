@@ -17,7 +17,7 @@ jobs:
       - name: Checkout dashboard frontend
         uses: actions/checkout@v4
         with:
-          repository: lavondev/inferencache-ui
+          repository: inferencache/inferencache-ui
           path: inferencache-dashboard
           token: ${{ secrets.GITHUB_TOKEN }}
 
