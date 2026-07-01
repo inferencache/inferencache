@@ -321,6 +321,14 @@ async def batch_status():
     return {"running": is_batch_running()}
 
 
+@router.get("/entries")
+async def get_entries(model: str = "gpt-4o-mini", limit: int = 500):
+    """Return cache entries for the map view."""
+    engine = get_engine(model, default_endpoint="dashboard/run-suite")
+    entries = engine.cache_store.list_entries(limit=limit)
+    return {"entries": entries}
+
+
 @router.get("/analyze")
 async def analyze_runs(batch_id: str | None = None):
     loop = asyncio.get_event_loop()

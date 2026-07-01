@@ -542,6 +542,23 @@ class CacheStore:
             top_entries=top_entries,
         )
 
+    def list_entries(self, limit: int = 500) -> list[dict]:
+        """Return cache entries for the map view, ordered by hit count."""
+        conn = sqlite3.connect(str(self._db_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT prompt_hash, prompt, model, created_at,
+                   hit_count, last_hit_at
+            FROM entries
+            ORDER BY hit_count DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
     def record_miss(self) -> None:
         """Record that a lookup resulted in a real API call."""
         with self._conn:
